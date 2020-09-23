@@ -33,6 +33,6 @@ distclean: clean
 
 install: all
 	mkdir -p $(BINDIR)
-	install -Dm755 gmnisrv $(BINDIR)/gmnisrv
+	install -Dm755 gmnisrv $(DESTDIR)$(BINDIR)/gmnisrv
 
 .PHONY: clean distclean docs install

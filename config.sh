@@ -13,6 +13,19 @@ do
 	case "$arg" in
 		--prefix=*)
 			PREFIX=${arg#*=}
+			if [ "$PREFIX" = "/usr" ]
+			then
+				SYSCONFDIR=/etc
+			fi
+			;;
+		--bindir=*)
+			BINDIR=${arg#*=}
+			;;
+		--sysconfdir=*)
+			SYSCONFDIR=${arg#*=}
+			;;
+		--mandir=*)
+			MANDIR=${arg#*=}
 			;;
 	esac
 done
@@ -123,15 +136,18 @@ run_configure() {
 	LIBS=$LIBS
 	PREFIX=${PREFIX:-/usr/local}
 	OUTDIR=${outdir}
-	_INSTDIR=\$(DESTDIR)\$(PREFIX)
-	BINDIR?=${BINDIR:-\$(_INSTDIR)/bin}
-	LIBDIR?=${LIBDIR:-\$(_INSTDIR)/lib}
-	MANDIR?=${MANDIR:-\$(_INSTDIR)/share/man}
+	BINDIR?=${BINDIR:-\$(PREFIX)/bin}
+	SYSCONFDIR?=${SYSCONFDIR:-\$(PREFIX)/etc}
+	LIBDIR?=${LIBDIR:-\$(PREFIX)/lib}
+	MANDIR?=${MANDIR:-\$(PREFIX)/share/man}
+	VARLIBDIR?=${MANDIR:-\$(PREFIX)/var/lib}
 	CACHE=\$(OUTDIR)/cache
 	CFLAGS=${CFLAGS}
 	CFLAGS+=-Iinclude -I\$(OUTDIR)
 	CFLAGS+=-DPREFIX='"\$(PREFIX)"'
 	CFLAGS+=-DLIBDIR='"\$(LIBDIR)"'
+	CFLAGS+=-DVARLIBDIR='"\$(VARLIBDIR)"'
+	CFLAGS+=-DSYSCONFDIR='"\$(SYSCONFDIR)"'
 
 	all: ${all}
 	EOF
