@@ -15,7 +15,7 @@ struct gmnisrv_host {
 };
 
 struct gmnisrv_bind {
-	int family;
+	int family, port;
 	char addr[sizeof(struct in6_addr)];
 	struct gmnisrv_bind *next;
 };

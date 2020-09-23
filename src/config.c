@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,9 +22,63 @@ gmnisrv_config_get_host(struct gmnisrv_config *conf, const char *hostname)
 static int
 parse_listen(struct gmnisrv_config *conf, const char *value)
 {
-	// TODO
-	(void)conf;
-	(void)value;
+	char listen[4096];
+	assert(strlen(value) < sizeof(listen) - 1);
+	strcpy(listen, value);
+
+	char *tok = strtok(listen, " ");
+	while (tok) {
+		char *port = tok;
+		struct gmnisrv_bind *bind =
+			calloc(1, sizeof(struct gmnisrv_bind));
+		bind->port = 1965;
+
+		if (tok[0] == '[') {
+			bind->family = AF_INET6;
+			char *e = strchr(tok, ']');
+			if (!e) {
+				fprintf(stderr,
+					"Error: invalid address specification %s\n",
+					tok);
+				return 0;
+			}
+			*e = '\0';
+			port = e + 1;
+			++tok;
+		} else {
+			bind->family = AF_INET;
+		}
+
+		port = strchr(port, ':');
+		if (port) {
+			*port = '\0';
+			++port;
+
+			char *endptr;
+			bind->port = strtoul(port, &endptr, 10);
+			if (*endptr) {
+				fprintf(stderr, "Error: invalid port %s\n", port);
+				return 0;
+			}
+			if (bind->port == 0 || bind->port > 65535) {
+				fprintf(stderr, "Error: invalid port %s\n", port);
+				return 0;
+			}
+		}
+
+		int r = inet_pton(bind->family, tok, bind->addr);
+		if (r != 1) {
+			fprintf(stderr,
+				"Error: invalid address specification %s\n",
+				tok);
+			return 0;
+		}
+
+		bind->next = conf->binds;
+		conf->binds = bind;
+		tok = strtok(NULL, " ");
+	}
+
 	return 1;
 }
 
