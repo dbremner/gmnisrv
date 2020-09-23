@@ -31,6 +31,6 @@ int load_config(struct gmnisrv_config *conf, const char *path);
 void config_finish(struct gmnisrv_config *conf);
 
 struct gmnisrv_host *gmnisrv_config_get_host(
-		struct gmnisrv_config *conf, const char *hostname);
+	struct gmnisrv_config *conf, const char *hostname);
 
 #endif

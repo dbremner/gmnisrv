@@ -1,10 +1,14 @@
 #include <arpa/inet.h>
 #include <assert.h>
 #include <errno.h>
+#include <signal.h>
+#include <stdarg.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <unistd.h>
 #include "config.h"
 #include "server.h"
 
@@ -18,10 +22,11 @@ server_init(struct gmnisrv_server *server, struct gmnisrv_config *conf)
 
 	assert(server->nlisten < 1024);
 	server->nfds = server->nlisten;
-	server->fds = calloc(server->nfds, sizeof(struct pollfd));
+	server->fds = calloc(1024, sizeof(struct pollfd));
+	server->fdsz = 1024;
 	assert(server->fds);
 
-	server->clientsz = 1024 - server->nlisten;
+	server->clientsz = 1024;
 	server->clients = calloc(server->clientsz, sizeof(struct gmnisrv_client));
 
 	size_t i = 0;
@@ -77,11 +82,182 @@ server_init(struct gmnisrv_server *server, struct gmnisrv_config *conf)
 	return 0;
 }
 
-void
-server_run(struct gmnisrv_server *server)
+// XXX: May be worth moving log stuff into a common module somewhere
+static void
+client_log(struct sockaddr *addr, const char *fmt, ...)
+{
+	char abuf[INET6_ADDRSTRLEN];
+	static char buf[INET6_ADDRSTRLEN + 1 + 4096];
+
+	const char *addrs = inet_ntop(addr->sa_family,
+		addr->sa_data, abuf, sizeof(abuf));
+	assert(addrs);
+
+	va_list ap;
+
+	va_start(ap, fmt);
+	size_t n = vsnprintf(buf, sizeof(buf), fmt, ap);
+	assert(n > 0);
+	va_end(ap);
+
+	fprintf(stderr, "%s\t%s\n", addrs, buf);
+}
+
+static struct pollfd *
+alloc_pollfd(struct gmnisrv_server *server)
+{
+	if (server->nfds >= server->fdsz) {
+		size_t fdsz = server->fdsz * 2;
+		struct pollfd *new = realloc(server->fds,
+			fdsz * sizeof(struct pollfd));
+		if (!new) {
+			fprintf(stderr, "<serv>\tOut of file descriptors!\n");
+			return NULL;
+		}
+		server->fds = new;
+		server->fdsz = fdsz;
+	}
+	return &server->fds[server->nfds++];
+}
+
+static void
+accept_client(struct gmnisrv_server *server, int fd)
+{
+	struct sockaddr addr;
+	socklen_t addrlen = sizeof(addr);
+
+	int sockfd = accept(fd, &addr, &addrlen);
+	if (sockfd == -1) {
+		fprintf(stderr, "<serv>\taccept error: %s\n", strerror(errno));
+		return;
+	}
+
+	if (server->nclients >= server->clientsz) {
+		size_t clientsz = server->clientsz * 2;
+		struct gmnisrv_client *new = realloc(server->clients,
+			clientsz * sizeof(struct gmnisrv_client));
+		if (!new) {
+			client_log(&addr, "disconnecting due to OOM condition");
+			close(sockfd);
+			return;
+		}
+		server->clients = new;
+		server->clientsz = clientsz;
+	}
+
+	struct pollfd *pollfd = alloc_pollfd(server);
+	if (pollfd == NULL) {
+		client_log(&addr, "disconnecting due to OOM condition");
+		close(sockfd);
+		return;
+	}
+
+	struct gmnisrv_client *client = &server->clients[server->nclients++];
+	client->sockfd = sockfd;
+	client->addrlen = addrlen;
+	memcpy(&client->addr, &addr, addrlen);
+	pollfd->fd = sockfd;
+	pollfd->events = POLLIN;
+	client_log(&client->addr, "connected");
+}
+
+static void
+disconnect_client(struct gmnisrv_server *server, struct gmnisrv_client *client)
+{
+	client_log(&client->addr, "disconnected");
+	close(client->sockfd);
+	size_t index = (client - server->clients) / sizeof(struct gmnisrv_client);
+	memmove(client, &client[1], &server->clients[server->clientsz] - client);
+	memmove(&server->fds[server->nlisten + index],
+		&server->fds[server->nlisten + index + 1],
+		server->fdsz - (server->nlisten + index + 1) * sizeof(struct pollfd));
+	--server->nfds;
+	--server->nclients;
+}
+
+static void
+client_readable(struct gmnisrv_server *server, struct gmnisrv_client *client)
+{
+	// TODO
+	ssize_t n = read(client->sockfd, client->buf, sizeof(client->buf));
+	if (n == 0) {
+		disconnect_client(server, client);
+		return;
+	}
+	(void)server;
+}
+
+static void
+client_writable(struct gmnisrv_server *server, struct gmnisrv_client *client)
 {
 	// TODO
 	(void)server;
+	(void)client;
+}
+
+bool *run;
+
+static void
+handle_sigint(int s, siginfo_t *i, void *c)
+{
+	*run = false;
+	(void)s; (void)i; (void)c;
+}
+
+void
+server_run(struct gmnisrv_server *server)
+{
+	struct sigaction act = {
+		.sa_sigaction = handle_sigint,
+		.sa_flags = SA_SIGINFO,
+	};
+	struct sigaction oint, oterm;
+	run = &server->run;
+	int r = sigaction(SIGINT, &act, &oint);
+	assert(r == 0);
+	r = sigaction(SIGTERM, &act, &oterm);
+	assert(r == 0);
+
+	server->run = true;
+	do {
+		r = poll(server->fds, server->nfds, -1);
+		if (r == -1 && (errno == EAGAIN || errno == EINTR)) {
+			continue;
+		} else if (r == -1) {
+			break;
+		}
+
+		for (size_t i = 0; i < server->nlisten; ++i) {
+			if ((server->fds[i].revents & POLLIN)) {
+				accept_client(server, server->fds[i].fd);
+			}
+			if ((server->fds[i].revents & POLLERR)) {
+				fprintf(stderr, "<serv>\tError on listener poll\n");
+				server->run = false;
+			}
+		}
+
+		for (size_t i = 0; i < server->nclients; ++i) {
+			if ((server->fds[server->nlisten + i].revents & (POLLHUP | POLLERR))) {
+				disconnect_client(server, &server->clients[i]);
+				--i;
+				continue;
+			}
+			if ((server->fds[server->nlisten + i].revents & POLLIN)) {
+				client_readable(server, &server->clients[i]);
+			}
+			if ((server->fds[server->nlisten + i].revents & POLLOUT)) {
+				client_writable(server, &server->clients[i]);
+			}
+		}
+	} while (server->run);
+
+	fprintf(stderr, "<serv>\tTerminating.\n");
+
+	r = sigaction(SIGINT, &oint, NULL);
+	assert(r == 0);
+	r = sigaction(SIGTERM, &oterm, NULL);
+	assert(r == 0);
 }
 
 void
