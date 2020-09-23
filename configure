@@ -7,8 +7,10 @@ gmnisrv() {
 		src/config.c \
 		src/escape.c \
 		src/ini.c \
+		src/log.c \
 		src/main.c \
 		src/server.c \
+		src/tls.c \
 		src/url.c
 }
 

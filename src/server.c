@@ -2,7 +2,6 @@
 #include <assert.h>
 #include <errno.h>
 #include <signal.h>
-#include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,6 +10,7 @@
 #include <unistd.h>
 #include "config.h"
 #include "server.h"
+#include "log.h"
 
 int
 server_init(struct gmnisrv_server *server, struct gmnisrv_config *conf)
@@ -82,27 +82,6 @@ server_init(struct gmnisrv_server *server, struct gmnisrv_config *conf)
 	return 0;
 }
 
-// XXX: May be worth moving log stuff into a common module somewhere
-static void
-client_log(struct sockaddr *addr, const char *fmt, ...)
-{
-	char abuf[INET6_ADDRSTRLEN];
-	static char buf[INET6_ADDRSTRLEN + 1 + 4096];
-
-	const char *addrs = inet_ntop(addr->sa_family,
-		addr->sa_data, abuf, sizeof(abuf));
-	assert(addrs);
-
-	va_list ap;
-
-	va_start(ap, fmt);
-	size_t n = vsnprintf(buf, sizeof(buf), fmt, ap);
-	assert(n > 0);
-	va_end(ap);
-
-	fprintf(stderr, "%s\t%s\n", addrs, buf);
-}
-
 static struct pollfd *
 alloc_pollfd(struct gmnisrv_server *server)
 {
@@ -137,7 +116,7 @@ accept_client(struct gmnisrv_server *server, int fd)
 		struct gmnisrv_client *new = realloc(server->clients,
 			clientsz * sizeof(struct gmnisrv_client));
 		if (!new) {
-			client_log(&addr, "disconnecting due to OOM condition");
+			client_error(&addr, "disconnecting due to OOM condition");
 			close(sockfd);
 			return;
 		}
@@ -147,7 +126,7 @@ accept_client(struct gmnisrv_server *server, int fd)
 
 	struct pollfd *pollfd = alloc_pollfd(server);
 	if (pollfd == NULL) {
-		client_log(&addr, "disconnecting due to OOM condition");
+		client_error(&addr, "disconnecting due to OOM condition");
 		close(sockfd);
 		return;
 	}
@@ -158,13 +137,11 @@ accept_client(struct gmnisrv_server *server, int fd)
 	memcpy(&client->addr, &addr, addrlen);
 	pollfd->fd = sockfd;
 	pollfd->events = POLLIN;
-	client_log(&client->addr, "connected");
 }
 
 static void
 disconnect_client(struct gmnisrv_server *server, struct gmnisrv_client *client)
 {
-	client_log(&client->addr, "disconnected");
 	close(client->sockfd);
 	size_t index = (client - server->clients) / sizeof(struct gmnisrv_client);
 	memmove(client, &client[1], &server->clients[server->clientsz] - client);
@@ -232,7 +209,7 @@ server_run(struct gmnisrv_server *server)
 				accept_client(server, server->fds[i].fd);
 			}
 			if ((server->fds[i].revents & POLLERR)) {
-				fprintf(stderr, "<serv>\tError on listener poll\n");
+				server_error("Error on listener poll");
 				server->run = false;
 			}
 		}
@@ -252,7 +229,7 @@ server_run(struct gmnisrv_server *server)
 		}
 	} while (server->run);
 
-	fprintf(stderr, "<serv>\tTerminating.\n");
+	server_log("Terminating.");
 
 	r = sigaction(SIGINT, &oint, NULL);
 	assert(r == 0);
