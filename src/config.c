@@ -31,7 +31,9 @@ parse_listen(struct gmnisrv_config *conf, const char *value)
 		char *port = tok;
 		struct gmnisrv_bind *bind =
 			calloc(1, sizeof(struct gmnisrv_bind));
+		assert(bind);
 		bind->port = 1965;
+		bind->name = strdup(tok);
 
 		if (tok[0] == '[') {
 			bind->family = AF_INET6;
@@ -133,6 +135,7 @@ conf_ini_handler(void *user, const char *section,
 	struct gmnisrv_host *host = gmnisrv_config_get_host(conf, section);
 	if (!host) {
 		host = calloc(1, sizeof(struct gmnisrv_host));
+		assert(host);
 		host->hostname = strdup(section);
 		host->next = conf->hosts;
 		conf->hosts = host;
@@ -193,4 +196,27 @@ load_config(struct gmnisrv_config *conf, const char *path)
 	}
 
 	return validate_config(conf);
+}
+
+void
+config_finish(struct gmnisrv_config *conf)
+{
+	free(conf->tls.store);
+	free(conf->tls.organization);
+	free(conf->tls.email);
+	struct gmnisrv_bind *bind = conf->binds;
+	while (bind) {
+		struct gmnisrv_bind *next = bind->next;
+		free(bind->name);
+		free(bind);
+		bind = next;
+	}
+	struct gmnisrv_host *host = conf->hosts;
+	while (host) {
+		struct gmnisrv_host *next = host->next;
+		free(host->hostname);
+		free(host->root);
+		free(host);
+		host = next;
+	}
 }

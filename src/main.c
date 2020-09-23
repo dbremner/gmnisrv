@@ -1,6 +1,7 @@
 #include <getopt.h>
 #include <stdio.h>
 #include "config.h"
+#include "server.h"
 
 static void
 usage(const char *argv_0)
@@ -36,8 +37,19 @@ main(int argc, char **argv)
 
 	int r = load_config(&conf, confpath);
 	if (r != 0) {
-		return r;
+		goto exit_conf;
 	}
 
+	struct gmnisrv_server server = {0};
+	r = server_init(&server, &conf);
+	if (r != 0) {
+		goto exit;
+	}
+	server_run(&server);
+
+exit:
+	server_finish(&server);
+exit_conf:
+	config_finish(&conf);
 	return 0;
 }

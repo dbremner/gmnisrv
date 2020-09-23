@@ -15,6 +15,7 @@ struct gmnisrv_host {
 };
 
 struct gmnisrv_bind {
+	char *name;
 	int family, port;
 	char addr[sizeof(struct in6_addr)];
 	struct gmnisrv_bind *next;
@@ -27,6 +28,7 @@ struct gmnisrv_config {
 };
 
 int load_config(struct gmnisrv_config *conf, const char *path);
+void config_finish(struct gmnisrv_config *conf);
 
 struct gmnisrv_host *gmnisrv_config_get_host(
 		struct gmnisrv_config *conf, const char *hostname);
