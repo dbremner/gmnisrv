@@ -50,7 +50,7 @@ server_init(struct gmnisrv_server *server, struct gmnisrv_config *conf)
 			in.sin6_port = htons(b->port);
 			addr = (struct sockaddr *)&in;
 			addrsz = sizeof(in);
-#ifdef LINUX
+#ifdef IPV6_V6ONLY
 			static int t = 1;
 			setsockopt(sockfd, IPPROTO_IPV6,
 				IPV6_V6ONLY, &t, sizeof(t));

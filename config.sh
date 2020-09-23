@@ -30,12 +30,6 @@ do
 	esac
 done
 
-case "$(uname)" in
-	Linux)
-		CFLAGS="$CFLAGS -DLINUX"
-		;;
-esac
-
 subdir() {
 	eval ". $srcdir/$1/configure"
 }
