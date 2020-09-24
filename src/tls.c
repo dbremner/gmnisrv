@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
+#include <openssl/err.h>
 #include <openssl/pem.h>
 #include <openssl/ssl.h>
 #include <openssl/x509.h>
@@ -102,9 +103,6 @@ tls_host_init(struct gmnisrv_tls *tlsconf, struct gmnisrv_host *host)
 		"%s/%s.key", tlsconf->store, host->hostname);
 	mkdirs(tlsconf->store, 0755);
 
-	host->ssl_ctx = SSL_CTX_new(TLS_method());
-	assert(host->ssl_ctx);
-
 	FILE *xf = fopen(crtpath, "r");
 	if (!xf && errno != ENOENT) {
 		server_error("error opening %s for reading: %s",
@@ -160,6 +158,14 @@ generate:
 int
 gmnisrv_tls_init(struct gmnisrv_config *conf)
 {
+	SSL_load_error_strings();
+	ERR_load_crypto_strings();
+
+	conf->tls.ssl_ctx = SSL_CTX_new(TLS_method());
+	assert(conf->tls.ssl_ctx);
+
+	SSL_CTX_set_tlsext_servername_callback(conf->tls.ssl_ctx, NULL);
+
 	int r;
 	for (struct gmnisrv_host *host = conf->hosts; host; host = host->next) {
 		r = tls_host_init(&conf->tls, host);
@@ -167,5 +173,25 @@ gmnisrv_tls_init(struct gmnisrv_config *conf)
 			return r;
 		}
 	}
+
 	return 0;
+}
+
+SSL *
+gmnisrv_tls_get_ssl(struct gmnisrv_config *conf, int fd)
+{
+	SSL *ssl = SSL_new(conf->tls.ssl_ctx);
+	if (!ssl) {
+		return NULL;
+	}
+	int r = SSL_set_fd(ssl, fd);
+	assert(r == 1);
+	return ssl;
+}
+
+void
+gmnisrv_tls_set_host(SSL *ssl, struct gmnisrv_host *host)
+{
+	SSL_use_certificate(ssl, host->x509);
+	SSL_use_PrivateKey(ssl, host->pkey);
 }

@@ -1,6 +1,7 @@
 #include <arpa/inet.h>
 #include <assert.h>
 #include <errno.h>
+#include <openssl/err.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -9,8 +10,9 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include "config.h"
-#include "server.h"
 #include "log.h"
+#include "server.h"
+#include "tls.h"
 
 int
 server_init(struct gmnisrv_server *server, struct gmnisrv_config *conf)
@@ -135,7 +137,7 @@ accept_client(struct gmnisrv_server *server, int fd)
 	struct gmnisrv_client *client = &server->clients[server->nclients++];
 	client->sockfd = sockfd;
 	client->addrlen = addrlen;
-	memcpy(&client->addr, &addr, addrlen);
+	memcpy(&client->addr, &addr, sizeof(addr));
 	pollfd->fd = sockfd;
 	pollfd->events = POLLIN;
 }
@@ -153,16 +155,72 @@ disconnect_client(struct gmnisrv_server *server, struct gmnisrv_client *client)
 	--server->nclients;
 }
 
+static int
+client_init_ssl(struct gmnisrv_server *server, struct gmnisrv_client *client)
+{
+	// TODO: Re-work this to use a non-blocking bio
+	client->ssl = gmnisrv_tls_get_ssl(server->conf, client->sockfd);
+	if (!client->ssl) {
+		client_error(&client->addr,
+			"unable to initialize SSL, disconnecting");
+		disconnect_client(server, client);
+		return 1;
+	}
+
+	int r = SSL_accept(client->ssl);
+	if (r != 1) {
+		r = SSL_get_error(client->ssl, r);
+		client_error(&client->addr, "SSL accept error %s, disconnecting",
+				ERR_error_string(r, NULL));
+		disconnect_client(server, client);
+		return 1;
+	}
+
+	BIO *sbio = BIO_new(BIO_f_ssl());
+	BIO_set_ssl(sbio, client->ssl, 0);
+	client->bio = BIO_new(BIO_f_buffer());
+	BIO_push(client->bio, sbio);
+	return 0;
+}
+
 static void
 client_readable(struct gmnisrv_server *server, struct gmnisrv_client *client)
 {
-	// TODO
-	ssize_t n = read(client->sockfd, client->buf, sizeof(client->buf));
-	if (n == 0) {
+	if (!client->ssl && client_init_ssl(server, client) != 0) {
+		return;
+	}
+
+	int r = BIO_gets(client->bio, client->buf, sizeof(client->buf));
+	if (r <= 0) {
+		r = SSL_get_error(client->ssl, r);
+		if (r == SSL_ERROR_WANT_READ) {
+			return;
+		}
+		client_error(&client->addr, "SSL read error %s, disconnecting",
+				ERR_error_string(r, NULL));
 		disconnect_client(server, client);
 		return;
 	}
-	(void)server;
+	client->buf[r] = '\0';
+
+	if (!client->host) {
+		// TODO: We can do a friendly disconnect at this point
+		client_error(&client->addr,
+			"client did not perform SNI, disconnecting");
+		disconnect_client(server, client);
+		return;
+	}
+
+	char *newline = strstr(client->buf, "\r\n");
+	if (!newline) {
+		// TODO: We can do a friendly disconnect at this point
+		client_error(&client->addr, "protocol error, disconnecting");
+		disconnect_client(server, client);
+		return;
+	}
+	*newline = 0;
+
+	client_log(&client->addr, "%s", client->buf);
 }
 
 static void
@@ -171,6 +229,37 @@ client_writable(struct gmnisrv_server *server, struct gmnisrv_client *client)
 	// TODO
 	(void)server;
 	(void)client;
+}
+
+static long
+sni_callback(SSL *ssl, int *al, void *arg)
+{
+	(void)al;
+	struct gmnisrv_server *server = (struct gmnisrv_server *)arg;
+	struct gmnisrv_client *client;
+	for (size_t i = 0; i < server->nclients; ++i) {
+		client = &server->clients[i];
+		if (client->ssl == ssl) {
+			break;
+		}
+		client = NULL;
+	}
+
+	if (!client) {
+		return SSL_TLSEXT_ERR_NOACK;
+	}
+
+	const char *hostname = SSL_get_servername(client->ssl,
+		SSL_get_servername_type(client->ssl));
+	struct gmnisrv_host *host = gmnisrv_config_get_host(
+		server->conf, hostname);
+	if (!host) {
+		return SSL_TLSEXT_ERR_NOACK;
+	}
+
+	client->host = host;
+	gmnisrv_tls_set_host(client->ssl, client->host);
+	return SSL_TLSEXT_ERR_OK;
 }
 
 bool *run;
@@ -195,6 +284,10 @@ server_run(struct gmnisrv_server *server)
 	assert(r == 0);
 	r = sigaction(SIGTERM, &act, &oterm);
 	assert(r == 0);
+
+	SSL_CTX_set_tlsext_servername_arg(server->conf->tls.ssl_ctx, server);
+	SSL_CTX_set_tlsext_servername_callback(
+		server->conf->tls.ssl_ctx, sni_callback);
 
 	server_log("gmnisrv started");
 

@@ -8,7 +8,7 @@
 static void
 server_logf(FILE *f, const char *fmt, va_list ap)
 {
-	fprintf(f, "<server>\t");
+	fprintf(f, "[gmnisrv] ");
 	vfprintf(f, fmt, ap);
 	fprintf(f, "\n");
 }
@@ -16,12 +16,12 @@ server_logf(FILE *f, const char *fmt, va_list ap)
 static void
 client_logf(FILE *f, struct sockaddr *addr, const char *fmt, va_list ap)
 {
-	char abuf[INET6_ADDRSTRLEN];
+	char abuf[INET6_ADDRSTRLEN + 1];
 	const char *addrs = inet_ntop(addr->sa_family,
 		addr->sa_data, abuf, sizeof(abuf));
 	assert(addrs);
 
-	fprintf(f, "%s\t", addrs);
+	fprintf(f, "%s ", addrs);
 	vfprintf(f, fmt, ap);
 	fprintf(f, "\n");
 }

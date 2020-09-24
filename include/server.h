@@ -1,5 +1,6 @@
 #ifndef GMNISRV_SERVER
 #define GMNISRV_SERVER
+#include <openssl/ssl.h>
 #include <poll.h>
 #include <stdbool.h>
 
@@ -8,11 +9,14 @@
 struct gmnisrv_client {
 	struct sockaddr addr;
 	socklen_t addrlen;
-
-	char buf[GEMINI_MAX_URL + 2];
-	size_t bufln;
-
 	int sockfd;
+
+	SSL *ssl;
+	BIO *bio;
+
+	char buf[GEMINI_MAX_URL + 3];
+
+	struct gmnisrv_host *host;
 };
 
 struct gmisrv_config;

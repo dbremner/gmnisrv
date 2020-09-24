@@ -1,6 +1,7 @@
 #include <getopt.h>
 #include <stdio.h>
 #include "config.h"
+#include "log.h"
 #include "server.h"
 #include "tls.h"
 
@@ -38,11 +39,13 @@ main(int argc, char **argv)
 
 	int r = load_config(&conf, confpath);
 	if (r != 0) {
+		server_error("Config load failed");
 		goto exit_conf;
 	}
 
 	r = gmnisrv_tls_init(&conf);
 	if (r != 0) {
+		server_error("TLS initialization failed");
 		goto exit_conf;
 	}
 
