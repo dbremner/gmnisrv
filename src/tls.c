@@ -86,10 +86,8 @@ tls_host_gencert(struct gmnisrv_tls *tlsconf, struct gmnisrv_host *host,
 		return 1;
 	}
 
-	r = SSL_CTX_use_certificate(host->ssl_ctx, x509);
-	assert(r == 1);
-	r = SSL_CTX_use_PrivateKey(host->ssl_ctx, pkey);
-	assert(r == 1);
+	host->x509 = x509;
+	host->pkey = pkey;
 	return 0;
 }
 
@@ -150,11 +148,8 @@ tls_host_init(struct gmnisrv_tls *tlsconf, struct gmnisrv_host *host)
 		goto generate;
 	}
 
-	r = SSL_CTX_use_certificate(host->ssl_ctx, x509);
-	assert(r == 1);
-	r = SSL_CTX_use_PrivateKey(host->ssl_ctx, pkey);
-	assert(r == 1);
-
+	host->x509 = x509;
+	host->pkey = pkey;
 	server_log("loaded certificate for %s", host->hostname);
 	return 0;
 

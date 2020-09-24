@@ -13,6 +13,8 @@ struct gmnisrv_host {
 	char *hostname;
 	char *root;
 	SSL_CTX *ssl_ctx;
+	X509 *x509;
+	EVP_PKEY *pkey;
 	struct gmnisrv_host *next;
 };
 
