@@ -1,6 +1,7 @@
 #ifndef GMNISRV_CONFIG
 #define GMNISRV_CONFIG
 #include <arpa/inet.h>
+#include <openssl/x509.h>
 
 struct gmnisrv_tls {
 	char *store;
@@ -11,6 +12,7 @@ struct gmnisrv_tls {
 struct gmnisrv_host {
 	char *hostname;
 	char *root;
+	SSL_CTX *ssl_ctx;
 	struct gmnisrv_host *next;
 };
 

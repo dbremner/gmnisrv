@@ -11,7 +11,8 @@ gmnisrv() {
 		src/main.c \
 		src/server.c \
 		src/tls.c \
-		src/url.c
+		src/url.c \
+		src/util.c
 }
 
 all="gmnisrv"

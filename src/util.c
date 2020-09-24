@@ -6,6 +6,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include "util.h"
+#include <stdio.h>
 
 static void
 posix_dirname(char *path, char *dname)
@@ -29,11 +30,11 @@ posix_dirname(char *path, char *dname)
 int
 mkdirs(char *path, mode_t mode)
 {
-	char dname[PATH_MAX + 1];
-	posix_dirname(path, dname);
-	if (strcmp(dname, "/") == 0) {
+	if (strcmp(path, "/") == 0 || strcmp(path, ".") == 0) {
 		return 0;
 	}
+	char dname[PATH_MAX + 1];
+	posix_dirname(path, dname);
 	if (mkdirs(dname, mode) != 0) {
 		return -1;
 	}

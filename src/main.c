@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include "config.h"
 #include "server.h"
+#include "tls.h"
 
 static void
 usage(const char *argv_0)
@@ -36,6 +37,11 @@ main(int argc, char **argv)
 	}
 
 	int r = load_config(&conf, confpath);
+	if (r != 0) {
+		goto exit_conf;
+	}
+
+	r = gmnisrv_tls_init(&conf);
 	if (r != 0) {
 		goto exit_conf;
 	}
