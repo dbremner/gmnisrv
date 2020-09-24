@@ -73,6 +73,7 @@ server_init(struct gmnisrv_server *server, struct gmnisrv_config *conf)
 		}
 
 		r = listen(sockfd, 16);
+		server_log("listening on %s", b->name);
 
 		server->fds[i].fd = sockfd;
 		server->fds[i].events = POLLIN;
@@ -195,6 +196,8 @@ server_run(struct gmnisrv_server *server)
 	r = sigaction(SIGTERM, &act, &oterm);
 	assert(r == 0);
 
+	server_log("gmnisrv started");
+
 	server->run = true;
 	do {
 		r = poll(server->fds, server->nfds, -1);
@@ -229,7 +232,7 @@ server_run(struct gmnisrv_server *server)
 		}
 	} while (server->run);
 
-	server_log("Terminating.");
+	server_log("gmnisrv terminating");
 
 	r = sigaction(SIGINT, &oint, NULL);
 	assert(r == 0);

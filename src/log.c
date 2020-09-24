@@ -10,6 +10,7 @@ server_logf(FILE *f, const char *fmt, va_list ap)
 {
 	fprintf(f, "<server>\t");
 	vfprintf(f, fmt, ap);
+	fprintf(f, "\n");
 }
 
 static void
@@ -22,6 +23,7 @@ client_logf(FILE *f, struct sockaddr *addr, const char *fmt, va_list ap)
 
 	fprintf(f, "%s\t", addrs);
 	vfprintf(f, fmt, ap);
+	fprintf(f, "\n");
 }
 
 void
