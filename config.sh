@@ -9,8 +9,16 @@ SCDOC=${SCDOC:-scdoc}
 
 for arg
 do
-	# TODO: Add args for install directories
 	case "$arg" in
+		--bindir=*)
+			BINDIR=${arg#*=}
+			;;
+		--libdir=*)
+			LIBDIR=${arg#*=}
+			;;
+		--mandir=*)
+			MANDIR=${arg#*=}
+			;;
 		--prefix=*)
 			PREFIX=${arg#*=}
 			if [ "$PREFIX" = "/usr" ]
@@ -18,14 +26,8 @@ do
 				SYSCONFDIR=/etc
 			fi
 			;;
-		--bindir=*)
-			BINDIR=${arg#*=}
-			;;
 		--sysconfdir=*)
 			SYSCONFDIR=${arg#*=}
-			;;
-		--mandir=*)
-			MANDIR=${arg#*=}
 			;;
 	esac
 done
