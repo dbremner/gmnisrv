@@ -26,8 +26,7 @@ struct gmnisrv_client {
 	SSL *ssl;
 	BIO *bio, *sbio;
 
-	char buf[BUFSIZ];
-	static_assert(BUFSIZ >= GEMINI_MAX_URL + 3);
+	char buf[BUFSIZ < GEMINI_MAX_URL + 3 ? GEMINI_MAX_URL + 3 : BUFSIZ];
 	size_t bufix, bufln;
 
 	enum response_state state;
