@@ -9,6 +9,7 @@ gmnisrv() {
 		src/ini.c \
 		src/log.c \
 		src/main.c \
+		src/mime.c \
 		src/server.c \
 		src/tls.c \
 		src/url.c \

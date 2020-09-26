@@ -13,6 +13,7 @@
 #include "config.h"
 #include "gemini.h"
 #include "log.h"
+#include "mime.h"
 #include "server.h"
 #include "tls.h"
 #include "url.h"
@@ -308,6 +309,45 @@ exit:
 }
 
 static void
+serve_request(struct gmnisrv_client *client)
+{
+	struct gmnisrv_host *host = client->host;
+	assert(host);
+	assert(host->root); // TODO: reverse proxy support
+
+	char path[PATH_MAX + 1];
+	int n = snprintf(path, sizeof(path), "%s%s", host->root, client->path);
+	if ((size_t)n >= sizeof(path)) {
+		client_submit_response(client, GEMINI_STATUS_PERMANENT_FAILURE,
+			"Request path exceeds PATH_MAX", -1);
+		return;
+	}
+
+	if (path[strlen(path) - 1] == '/') {
+		// TODO: Let user configure index file name?
+		strncat(path, "index.gmi", sizeof(path) - 1);
+	}
+
+	int fd = open(path, O_RDONLY);
+	if (fd == -1) {
+		if (errno == ENOENT) {
+			client_submit_response(client, GEMINI_STATUS_NOT_FOUND,
+				"Not found", -1);
+			return;
+		} else {
+			client_error(&client->addr, "error opening %s: %s",
+					path, strerror(errno));
+			client_submit_response(client, GEMINI_STATUS_PERMANENT_FAILURE,
+				"Internal server error", -1);
+			return;
+		}
+	}
+
+	const char *meta = gmnisrv_mimetype_for_path(path);
+	client_submit_response(client, GEMINI_STATUS_SUCCESS, meta, fd);
+}
+
+static void
 client_readable(struct gmnisrv_server *server, struct gmnisrv_client *client)
 {
 	if (!client->ssl && client_init_ssl(server, client) != 0) {
@@ -347,10 +387,7 @@ client_readable(struct gmnisrv_server *server, struct gmnisrv_client *client)
 		return;
 	}
 
-	// TODO: prep response
-	const char *error = "TODO: Finish implementation";
-	client_submit_response(client,
-		GEMINI_STATUS_TEMPORARY_FAILURE, error, -1);
+	serve_request(client);
 }
 
 static void
@@ -376,24 +413,58 @@ client_writable(struct gmnisrv_server *server, struct gmnisrv_client *client)
 				return;
 			}
 			client->status = GEMINI_STATUS_NONE;
-			client_error(&client->addr, "SSL read error %s, disconnecting",
-					ERR_error_string(r, NULL));
+			client_error(&client->addr,
+				"header write error %s, disconnecting",
+				ERR_error_string(r, NULL));
 			disconnect_client(server, client);
 			return;
 		}
 		client->bufix += r;
 		if (client->bufix >= client->bufln) {
-			// TODO: Start sending response body as well
-			disconnect_client(server, client);
+			if (client->bodyfd == -1) {
+				disconnect_client(server, client);
+			} else {
+				client->state = RESPOND_BODY;
+				client->bufix = client->bufln = 0;
+			}
 			return;
 		}
 		break;
 	case RESPOND_BODY:
-		assert(0);
+		if (client->bufix >= client->bufln) {
+			n = read(client->bodyfd,
+				client->buf, sizeof(client->buf));
+			if (n == -1) {
+				client_error(&client->addr,
+					"Error reading response body: %s",
+					strerror(errno));
+				disconnect_client(server, client);
+				return;
+			}
+			if (n == 0) {
+				// EOF
+				disconnect_client(server, client);
+				return;
+			}
+			client->bufln = n;
+			client->bufix = 0;
+		}
+		r = BIO_write(client->sbio, &client->buf[client->bufix],
+			client->bufln - client->bufix);
+		if (r <= 0) {
+			r = SSL_get_error(client->ssl, r);
+			if (r == SSL_ERROR_WANT_WRITE) {
+				return;
+			}
+			client->status = GEMINI_STATUS_NONE;
+			client_error(&client->addr, "body write error %s, disconnecting",
+					ERR_error_string(r, NULL));
+			disconnect_client(server, client);
+			return;
+		}
+		client->bufix += r;
 		break;
 	}
-
-	(void)server;
 }
 
 static long
