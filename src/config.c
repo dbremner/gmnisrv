@@ -98,7 +98,6 @@ conf_ini_handler(void *user, const char *section,
 	} strvars[] = {
 		{ ":tls", "store", &conf->tls.store },
 		{ ":tls", "organization", &conf->tls.organization },
-		{ ":tls", "email", &conf->tls.email },
 	};
 	struct {
 		char *section;
@@ -223,7 +222,6 @@ config_finish(struct gmnisrv_config *conf)
 {
 	free(conf->tls.store);
 	free(conf->tls.organization);
-	free(conf->tls.email);
 	struct gmnisrv_bind *bind = conf->binds;
 	while (bind) {
 		struct gmnisrv_bind *next = bind->next;

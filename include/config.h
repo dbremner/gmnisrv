@@ -7,7 +7,6 @@
 struct gmnisrv_tls {
 	char *store;
 	char *organization;
-	char *email;
 	SSL_CTX *ssl_ctx;
 };
 
