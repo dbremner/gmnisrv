@@ -35,8 +35,11 @@ store=/var/lib/gemini/certs
 # Optional details for new certificates
 organization=gmnisrv user
 
-[localhost]
-root=/var/www
+[example.org]
+root=/srv/gemini/example.org
+
+[example.com]
+root=/srv/gemini/example.com
 ```
 
 For full details on gmnisrv configuration, consult the **gmnisrv**(5) manual
