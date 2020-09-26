@@ -152,6 +152,7 @@ accept_client(struct gmnisrv_server *server, int fd)
 	client->pollfd = pollfd;
 	client->addrlen = addrlen;
 	client->server = server;
+	client->bodyfd = -1;
 	clock_gettime(CLOCK_MONOTONIC, &client->ctime);
 	memcpy(&client->addr, &addr, sizeof(addr));
 
@@ -181,7 +182,8 @@ disconnect_client(struct gmnisrv_server *server, struct gmnisrv_client *client)
 		clock_gettime(CLOCK_MONOTONIC, &now);
 		timespec_diff(&client->ctime, &now, &diff);
 		int ms = diff.tv_sec * 1000 + (int)(diff.tv_nsec / 1.0e6);
-		client_log(&client->addr, "%dms %s %s %02d %s", ms,
+		client_log(&client->addr, "%3dms %5d %s %s %02d %s",
+			ms, client->bbytes,
 			client->host ? client->host->hostname : "(none)",
 			client->path ? client->path : "(none)",
 			(int)client->status, client->meta);
@@ -446,6 +448,7 @@ client_writable(struct gmnisrv_server *server, struct gmnisrv_client *client)
 				disconnect_client(server, client);
 				return;
 			}
+			client->bbytes += n;
 			client->bufln = n;
 			client->bufix = 0;
 		}

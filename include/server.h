@@ -32,6 +32,7 @@ struct gmnisrv_client {
 	enum gemini_status status;
 	char *meta;
 	int bodyfd;
+	size_t bbytes;
  
 	struct gmnisrv_host *host;
 	char *path;
