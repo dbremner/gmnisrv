@@ -58,8 +58,19 @@ struct gmnisrv_server {
 	bool run;
 };
 
+// server.c
 int server_init(struct gmnisrv_server *server, struct gmnisrv_config *conf);
 void server_run(struct gmnisrv_server *server);
 void server_finish(struct gmnisrv_server *server);
+
+void disconnect_client(struct gmnisrv_server *server,
+		struct gmnisrv_client *client);
+
+// serve.c
+void serve_request(struct gmnisrv_client *client);
+bool request_validate(struct gmnisrv_client *client, char **path);
+void client_submit_response(struct gmnisrv_client *client,
+	enum gemini_status status, const char *meta, int bodyfd);
+void client_oom(struct gmnisrv_client *client);
 
 #endif

@@ -11,6 +11,7 @@ gmnisrv() {
 		src/main.c \
 		src/mime.c \
 		src/server.c \
+		src/serve.c \
 		src/tls.c \
 		src/url.c \
 		src/util.c
