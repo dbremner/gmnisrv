@@ -26,6 +26,9 @@ do
 				SYSCONFDIR=/etc
 			fi
 			;;
+		--sharedir=*)
+			SHAREDIR=${arg#*=}
+			;;
 		--sysconfdir=*)
 			SYSCONFDIR=${arg#*=}
 			;;
@@ -138,7 +141,9 @@ run_configure() {
 	LIBS=$LIBS
 	PREFIX=${PREFIX:-/usr/local}
 	OUTDIR=${outdir}
+	SRCDIR=${srcdir}
 	BINDIR?=${BINDIR:-\$(PREFIX)/bin}
+	SHAREDIR?=${SHAREDIR:-\$(PREFIX)/share}
 	SYSCONFDIR?=${SYSCONFDIR:-\$(PREFIX)/etc}
 	LIBDIR?=${LIBDIR:-\$(PREFIX)/lib}
 	MANDIR?=${MANDIR:-\$(PREFIX)/share/man}
