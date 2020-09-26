@@ -185,9 +185,11 @@ disconnect_client(struct gmnisrv_server *server, struct gmnisrv_client *client)
 			client->path ? client->path : "(none)",
 			(int)client->status, client->meta);
 	}
+	if (client->bio) {
+		BIO_free_all(client->bio);
+	}
 	close(client->sockfd);
 	free(client->meta);
-	// TODO: Close bios, body, etc
 
 	size_t index = (client - server->clients) / sizeof(struct gmnisrv_client);
 	memmove(client, &client[1], &server->clients[server->clientsz] - client);
@@ -426,7 +428,6 @@ sni_callback(SSL *ssl, int *al, void *arg)
 }
 
 bool *run;
-
 static void
 handle_sigint(int s, siginfo_t *i, void *c)
 {
