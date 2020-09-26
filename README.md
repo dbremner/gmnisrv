@@ -39,8 +39,9 @@ organization=gmnisrv user
 root=/var/www
 ```
 
-For full details on gmnisrv configuration, consult the *gmnisrv*(5) manual page.
+For full details on gmnisrv configuration, consult the **gmnisrv**(5) manual
+page.
 
 ## Usage
 
-See *gmnisrv*(1).
+See **gmnisrv**(1).
