@@ -1,5 +1,6 @@
 #ifndef GMNISRV_SERVER
 #define GMNISRV_SERVER
+#include <assert.h>
 #include <openssl/ssl.h>
 #include <poll.h>
 #include <time.h>
@@ -25,7 +26,8 @@ struct gmnisrv_client {
 	SSL *ssl;
 	BIO *bio, *sbio;
 
-	char buf[GEMINI_MAX_URL + 3];
+	char buf[BUFSIZ];
+	static_assert(BUFSIZ >= GEMINI_MAX_URL + 3);
 	size_t bufix, bufln;
 
 	enum response_state state;

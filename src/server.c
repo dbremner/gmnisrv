@@ -362,7 +362,6 @@ client_readable(struct gmnisrv_server *server, struct gmnisrv_client *client)
 		return;
 	}
 
-	// XXX: Can buf be statically allocated?
 	int r = BIO_gets(client->bio, client->buf, sizeof(client->buf));
 	if (r <= 0) {
 		r = SSL_get_error(client->ssl, r);
