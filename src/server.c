@@ -1,6 +1,7 @@
 #include <arpa/inet.h>
 #include <assert.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <openssl/err.h>
 #include <signal.h>
 #include <stdbool.h>
@@ -110,7 +111,15 @@ accept_client(struct gmnisrv_server *server, int fd)
 
 	int sockfd = accept(fd, &addr, &addrlen);
 	if (sockfd == -1) {
-		fprintf(stderr, "<serv>\taccept error: %s\n", strerror(errno));
+		server_error("accept error: %s", strerror(errno));
+		return;
+	}
+
+	int flags = fcntl(fd, F_GETFL);
+	int r = fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+	if (r == -1) {
+		close(sockfd);
+		server_error("error setting O_NONBLOCK on client fd: %s", strerror(errno));
 		return;
 	}
 
@@ -158,7 +167,6 @@ disconnect_client(struct gmnisrv_server *server, struct gmnisrv_client *client)
 static int
 client_init_ssl(struct gmnisrv_server *server, struct gmnisrv_client *client)
 {
-	// TODO: Re-work this to use a non-blocking bio
 	client->ssl = gmnisrv_tls_get_ssl(server->conf, client->sockfd);
 	if (!client->ssl) {
 		client_error(&client->addr,
@@ -170,6 +178,9 @@ client_init_ssl(struct gmnisrv_server *server, struct gmnisrv_client *client)
 	int r = SSL_accept(client->ssl);
 	if (r != 1) {
 		r = SSL_get_error(client->ssl, r);
+		if (r == SSL_ERROR_WANT_READ || r == SSL_ERROR_WANT_WRITE) {
+			return 1;
+		}
 		client_error(&client->addr, "SSL accept error %s, disconnecting",
 				ERR_error_string(r, NULL));
 		disconnect_client(server, client);
