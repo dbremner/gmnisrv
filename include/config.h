@@ -2,6 +2,7 @@
 #define GMNISRV_CONFIG
 #include <arpa/inet.h>
 #include <openssl/x509.h>
+#include <stdbool.h>
 
 struct gmnisrv_tls {
 	char *store;
@@ -13,8 +14,12 @@ struct gmnisrv_tls {
 struct gmnisrv_host {
 	char *hostname;
 	char *root;
+	char *index;
+	bool autoindex;
+
 	X509 *x509;
 	EVP_PKEY *pkey;
+
 	struct gmnisrv_host *next;
 };
 

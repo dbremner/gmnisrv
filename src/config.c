@@ -1,8 +1,10 @@
 #include <assert.h>
 #include <errno.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include "config.h"
 #include "ini.h"
 
@@ -146,6 +148,13 @@ conf_ini_handler(void *user, const char *section,
 		char **value;
 	} host_strvars[] = {
 		{ "root", &host->root },
+		{ "index", &host->index },
+	};
+	struct {
+		char *name;
+		bool *value;
+	} host_bvars[] = {
+		{ "autoindex", &host->autoindex },
 	};
 
 	for (size_t i = 0; i < sizeof(host_strvars) / sizeof(host_strvars[0]); ++i) {
@@ -153,6 +162,17 @@ conf_ini_handler(void *user, const char *section,
 			continue;
 		}
 		*host_strvars[i].value = strdup(value);
+		return 1;
+	}
+
+	for (size_t i = 0; i < sizeof(host_bvars) / sizeof(host_bvars[0]); ++i) {
+		if (strcmp(host_bvars[i].name, name) != 0) {
+			continue;
+		}
+		*host_bvars[i].value =
+			strcasecmp(value, "yes") == 0 ||
+			strcasecmp(value, "true") == 0 ||
+			strcasecmp(value, "on") == 0;
 		return 1;
 	}
 

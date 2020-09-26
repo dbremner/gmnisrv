@@ -150,7 +150,6 @@ accept_client(struct gmnisrv_server *server, int fd)
 	client->pollfd = pollfd;
 	client->addrlen = addrlen;
 	client->server = server;
-	client->bodyfd = -1;
 	clock_gettime(CLOCK_MONOTONIC, &client->ctime);
 	memcpy(&client->addr, &addr, sizeof(addr));
 
@@ -240,7 +239,7 @@ client_readable(struct gmnisrv_server *server, struct gmnisrv_client *client)
 	if (!client->host) {
 		const char *error = "This server requires clients to support the TLS SNI (server name identification) extension";
 		client_submit_response(client,
-			GEMINI_STATUS_BAD_REQUEST, error, -1);
+			GEMINI_STATUS_BAD_REQUEST, error, NULL);
 		return;
 	}
 
@@ -261,7 +260,7 @@ client_readable(struct gmnisrv_server *server, struct gmnisrv_client *client)
 	if (!newline) {
 		const char *error = "Protocol error: malformed request";
 		client_submit_response(client,
-			GEMINI_STATUS_BAD_REQUEST, error, -1);
+			GEMINI_STATUS_BAD_REQUEST, error, NULL);
 		return;
 	}
 	*newline = 0;
@@ -304,7 +303,7 @@ client_writable(struct gmnisrv_server *server, struct gmnisrv_client *client)
 		}
 		client->bufix += r;
 		if (client->bufix >= client->bufln) {
-			if (client->bodyfd == -1) {
+			if (!client->body) {
 				disconnect_client(server, client);
 			} else {
 				client->state = RESPOND_BODY;
@@ -315,8 +314,8 @@ client_writable(struct gmnisrv_server *server, struct gmnisrv_client *client)
 		break;
 	case RESPOND_BODY:
 		if (client->bufix >= client->bufln) {
-			n = read(client->bodyfd,
-				client->buf, sizeof(client->buf));
+			n = fread(client->buf, 1,
+				sizeof(client->buf), client->body);
 			if (n == -1) {
 				client_error(&client->addr,
 					"Error reading response body: %s",
