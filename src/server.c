@@ -49,15 +49,15 @@ server_init(struct gmnisrv_server *server, struct gmnisrv_config *conf)
 		if (b->family == AF_INET) {
 			struct sockaddr_in in = {0};
 			in.sin_family = AF_INET;
-			memcpy(&in.sin_addr, b->addr, sizeof(struct in_addr));
 			in.sin_port = htons(b->port);
+			memcpy(&in.sin_addr, b->addr, sizeof(struct in_addr));
 			addr = (struct sockaddr *)&in;
 			addrsz = sizeof(in);
 		} else if (b->family == AF_INET6) {
 			struct sockaddr_in6 in = {0};
 			in.sin6_family = AF_INET6;
-			memcpy(&in.sin6_addr, b->addr, sizeof(struct in6_addr));
 			in.sin6_port = htons(b->port);
+			memcpy(&in.sin6_addr, b->addr, sizeof(struct in6_addr));
 			addr = (struct sockaddr *)&in;
 			addrsz = sizeof(in);
 #ifdef IPV6_V6ONLY
