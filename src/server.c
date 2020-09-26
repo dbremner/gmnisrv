@@ -188,8 +188,15 @@ disconnect_client(struct gmnisrv_server *server, struct gmnisrv_client *client)
 	if (client->bio) {
 		BIO_free_all(client->bio);
 	}
+	if (client->ssl) {
+		SSL_free(client->ssl);
+	}
+	if (client->body) {
+		fclose(client->body);
+	}
 	close(client->sockfd);
 	free(client->meta);
+	free(client->path);
 
 	size_t index = (client - server->clients) / sizeof(struct gmnisrv_client);
 	memmove(client, &client[1], &server->clients[server->clientsz] - client);
