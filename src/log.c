@@ -31,7 +31,7 @@ server_log(const char *fmt, ...)
 {
 	va_list ap;
 	va_start(ap, fmt);
-	server_logf(stdout, fmt, ap);
+	server_logf(stderr, fmt, ap);
 	va_end(ap);
 }
 
