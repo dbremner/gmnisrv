@@ -46,22 +46,22 @@ server_init(struct gmnisrv_server *server, struct gmnisrv_config *conf)
 		static const int t = 1;
 		setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &t, sizeof(t));
 
+		struct sockaddr_in in = {0};
+		struct sockaddr_in6 in6 = {0};
 		struct sockaddr *addr;
 		size_t addrsz;
 		if (b->family == AF_INET) {
-			struct sockaddr_in in = {0};
 			in.sin_family = AF_INET;
 			in.sin_port = htons(b->port);
 			memcpy(&in.sin_addr, b->addr, sizeof(struct in_addr));
 			addr = (struct sockaddr *)&in;
 			addrsz = sizeof(in);
 		} else if (b->family == AF_INET6) {
-			struct sockaddr_in6 in = {0};
-			in.sin6_family = AF_INET6;
-			in.sin6_port = htons(b->port);
-			memcpy(&in.sin6_addr, b->addr, sizeof(struct in6_addr));
-			addr = (struct sockaddr *)&in;
-			addrsz = sizeof(in);
+			in6.sin6_family = AF_INET6;
+			in6.sin6_port = htons(b->port);
+			memcpy(&in6.sin6_addr, b->addr, sizeof(struct in6_addr));
+			addr = (struct sockaddr *)&in6;
+			addrsz = sizeof(in6);
 #ifdef IPV6_V6ONLY
 			setsockopt(sockfd, IPPROTO_IPV6,
 				IPV6_V6ONLY, &t, sizeof(t));
