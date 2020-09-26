@@ -4,6 +4,12 @@ gmnisrv is a simple [Gemini](https://gemini.circumlunar.space) protocol server.
 
 ## Installation
 
+Dependencies:
+
+- A C11 compiler and a POSIX-like system
+- OpenSSL
+- [scdoc](https://git.sr.ht/~sircmpwn/scdoc) (optional)
+
 ```
 $ mkdir build
 $ cd build
