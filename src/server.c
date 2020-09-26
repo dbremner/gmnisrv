@@ -43,6 +43,8 @@ server_init(struct gmnisrv_server *server, struct gmnisrv_config *conf)
 				b->name, strerror(errno));
 			return 1;
 		}
+		static const int t = 1;
+		setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &t, sizeof(t));
 
 		struct sockaddr *addr;
 		size_t addrsz;
@@ -61,7 +63,6 @@ server_init(struct gmnisrv_server *server, struct gmnisrv_config *conf)
 			addr = (struct sockaddr *)&in;
 			addrsz = sizeof(in);
 #ifdef IPV6_V6ONLY
-			static int t = 1;
 			setsockopt(sockfd, IPPROTO_IPV6,
 				IPV6_V6ONLY, &t, sizeof(t));
 #endif
