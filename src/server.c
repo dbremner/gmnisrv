@@ -210,7 +210,7 @@ disconnect_client(struct gmnisrv_server *server, struct gmnisrv_client *client)
 static int
 client_init_ssl(struct gmnisrv_server *server, struct gmnisrv_client *client)
 {
-	client->ssl = gmnisrv_tls_get_ssl(server->conf, client->sockfd);
+	client->ssl = tls_get_ssl(server->conf, client->sockfd);
 	if (!client->ssl) {
 		client_error(&client->addr,
 			"unable to initialize SSL, disconnecting");
@@ -377,6 +377,10 @@ sni_callback(SSL *ssl, int *al, void *arg)
 
 	const char *hostname = SSL_get_servername(client->ssl,
 		SSL_get_servername_type(client->ssl));
+	if (!hostname) {
+		return SSL_TLSEXT_ERR_NOACK;
+	}
+
 	struct gmnisrv_host *host = gmnisrv_config_get_host(
 		server->conf, hostname);
 	if (!host) {
@@ -384,7 +388,7 @@ sni_callback(SSL *ssl, int *al, void *arg)
 	}
 
 	client->host = host;
-	gmnisrv_tls_set_host(client->ssl, client->host);
+	tls_set_host(client->ssl, client->host);
 	return SSL_TLSEXT_ERR_OK;
 }
 
@@ -461,6 +465,12 @@ server_run(struct gmnisrv_server *server)
 void
 server_finish(struct gmnisrv_server *server)
 {
-	// TODO
-	(void)server;
+	while (server->nclients) {
+		disconnect_client(server, &server->clients[0]);
+	}
+	for (size_t i = 0; i < server->nfds; ++i) {
+		close(server->fds[i].fd);
+	}
+	free(server->fds);
+	free(server->clients);
 }

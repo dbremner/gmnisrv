@@ -40,10 +40,10 @@ main(int argc, char **argv)
 	int r = load_config(&conf, confpath);
 	if (r != 0) {
 		server_error("Config load failed");
-		goto exit_conf;
+		goto exit;
 	}
 
-	r = gmnisrv_tls_init(&conf);
+	r = tls_init(&conf);
 	if (r != 0) {
 		server_error("TLS initialization failed");
 		goto exit_conf;
@@ -52,13 +52,15 @@ main(int argc, char **argv)
 	struct gmnisrv_server server = {0};
 	r = server_init(&server, &conf);
 	if (r != 0) {
-		goto exit;
+		goto exit_tls;
 	}
 	server_run(&server);
 
-exit:
 	server_finish(&server);
+exit_tls:
+	tls_finish(&conf);
 exit_conf:
 	config_finish(&conf);
+exit:
 	return 0;
 }

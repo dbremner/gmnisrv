@@ -236,6 +236,7 @@ config_finish(struct gmnisrv_config *conf)
 		struct gmnisrv_host *next = host->next;
 		free(host->hostname);
 		free(host->root);
+		free(host->index);
 		free(host);
 		host = next;
 	}

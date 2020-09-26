@@ -156,7 +156,7 @@ generate:
 }
 
 int
-gmnisrv_tls_init(struct gmnisrv_config *conf)
+tls_init(struct gmnisrv_config *conf)
 {
 	SSL_load_error_strings();
 	ERR_load_crypto_strings();
@@ -177,8 +177,18 @@ gmnisrv_tls_init(struct gmnisrv_config *conf)
 	return 0;
 }
 
+void
+tls_finish(struct gmnisrv_config *conf)
+{
+	SSL_CTX_free(conf->tls.ssl_ctx);
+	for (struct gmnisrv_host *host = conf->hosts; host; host = host->next) {
+		X509_free(host->x509);
+		EVP_PKEY_free(host->pkey);
+	}
+}
+
 SSL *
-gmnisrv_tls_get_ssl(struct gmnisrv_config *conf, int fd)
+tls_get_ssl(struct gmnisrv_config *conf, int fd)
 {
 	SSL *ssl = SSL_new(conf->tls.ssl_ctx);
 	if (!ssl) {
@@ -190,7 +200,7 @@ gmnisrv_tls_get_ssl(struct gmnisrv_config *conf, int fd)
 }
 
 void
-gmnisrv_tls_set_host(SSL *ssl, struct gmnisrv_host *host)
+tls_set_host(SSL *ssl, struct gmnisrv_host *host)
 {
 	SSL_use_certificate(ssl, host->x509);
 	SSL_use_PrivateKey(ssl, host->pkey);
