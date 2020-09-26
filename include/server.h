@@ -2,21 +2,39 @@
 #define GMNISRV_SERVER
 #include <openssl/ssl.h>
 #include <poll.h>
+#include <time.h>
 #include <stdbool.h>
+#include "gemini.h"
+#include "url.h"
 
-#define GEMINI_MAX_URL 1024
+struct gmnisrv_server;
+
+enum response_state {
+	RESPOND_HEADER,
+	RESPOND_BODY,
+};
 
 struct gmnisrv_client {
+	struct gmnisrv_server *server;
+	struct timespec ctime;
 	struct sockaddr addr;
 	socklen_t addrlen;
 	int sockfd;
+	struct pollfd *pollfd;
 
 	SSL *ssl;
-	BIO *bio;
+	BIO *bio, *sbio;
 
 	char buf[GEMINI_MAX_URL + 3];
+	size_t bufix, bufln;
 
+	enum response_state state;
+	enum gemini_status status;
+	char *meta;
+	int bodyfd;
+ 
 	struct gmnisrv_host *host;
+	char *path;
 };
 
 struct gmisrv_config;

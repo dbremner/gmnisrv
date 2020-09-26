@@ -11,9 +11,11 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include "config.h"
+#include "gemini.h"
 #include "log.h"
 #include "server.h"
 #include "tls.h"
+#include "url.h"
 
 int
 server_init(struct gmnisrv_server *server, struct gmnisrv_config *conf)
@@ -144,17 +146,49 @@ accept_client(struct gmnisrv_server *server, int fd)
 	}
 
 	struct gmnisrv_client *client = &server->clients[server->nclients++];
+	memset(client, 0, sizeof(*client));
 	client->sockfd = sockfd;
+	client->pollfd = pollfd;
 	client->addrlen = addrlen;
+	client->server = server;
+	clock_gettime(CLOCK_MONOTONIC, &client->ctime);
 	memcpy(&client->addr, &addr, sizeof(addr));
+
 	pollfd->fd = sockfd;
 	pollfd->events = POLLIN;
+}
+
+
+static void
+timespec_diff(struct timespec *start,
+	struct timespec *stop, struct timespec *out)
+{
+    if ((stop->tv_nsec - start->tv_nsec) < 0) {
+        out->tv_sec = stop->tv_sec - start->tv_sec - 1;
+        out->tv_nsec = stop->tv_nsec - start->tv_nsec + 1000000000;
+    } else {
+        out->tv_sec = stop->tv_sec - start->tv_sec;
+        out->tv_nsec = stop->tv_nsec - start->tv_nsec;
+    }
 }
 
 static void
 disconnect_client(struct gmnisrv_server *server, struct gmnisrv_client *client)
 {
+	if (client->status != GEMINI_STATUS_NONE) {
+		struct timespec now, diff;
+		clock_gettime(CLOCK_MONOTONIC, &now);
+		timespec_diff(&client->ctime, &now, &diff);
+		int ms = diff.tv_sec * 1000 + (int)(diff.tv_nsec / 1.0e6);
+		client_log(&client->addr, "%dms %s %s %02d %s", ms,
+			client->host ? client->host->hostname : "(none)",
+			client->path ? client->path : "(none)",
+			(int)client->status, client->meta);
+	}
 	close(client->sockfd);
+	free(client->meta);
+	// TODO: Close bios, body, etc
+
 	size_t index = (client - server->clients) / sizeof(struct gmnisrv_client);
 	memmove(client, &client[1], &server->clients[server->clientsz] - client);
 	memmove(&server->fds[server->nlisten + index],
@@ -187,11 +221,88 @@ client_init_ssl(struct gmnisrv_server *server, struct gmnisrv_client *client)
 		return 1;
 	}
 
-	BIO *sbio = BIO_new(BIO_f_ssl());
-	BIO_set_ssl(sbio, client->ssl, 0);
+	client->sbio = BIO_new(BIO_f_ssl());
+	BIO_set_ssl(client->sbio, client->ssl, 0);
 	client->bio = BIO_new(BIO_f_buffer());
-	BIO_push(client->bio, sbio);
+	BIO_push(client->bio, client->sbio);
 	return 0;
+}
+
+static void
+client_submit_response(struct gmnisrv_client *client,
+	enum gemini_status status, const char *meta, int bodyfd)
+{
+	client->status = status;
+	client->meta = strdup(meta);
+	client->bodyfd = bodyfd;
+	client->pollfd->events = POLLOUT;
+}
+
+static void
+client_oom(struct gmnisrv_client *client)
+{
+	const char *error = "Out of memory";
+	client_submit_response(client,
+		GEMINI_STATUS_TEMPORARY_FAILURE, error, -1);
+}
+
+static bool
+request_validate(struct gmnisrv_client *client, char **path)
+{
+	struct Curl_URL *url = curl_url();
+	if (!url) {
+		client_oom(client);
+		return false;
+	}
+	if (curl_url_set(url, CURLUPART_URL, client->buf, 0) != CURLUE_OK) {
+		const char *error = "Protocol error: invalid URL";
+		client_submit_response(client,
+			GEMINI_STATUS_BAD_REQUEST, error, -1);
+		goto exit;
+	}
+
+	char *part;
+	if (curl_url_get(url, CURLUPART_SCHEME, &part, 0) != CURLUE_OK) {
+		const char *error = "Protocol error: invalid URL (expected scheme)";
+		client_submit_response(client,
+			GEMINI_STATUS_BAD_REQUEST, error, -1);
+		goto exit;
+	} else if (strcmp(part, "gemini") != 0) {
+		free(part);
+		const char *error = "Refusing proxy to non-gemini URL";
+		client_submit_response(client,
+			GEMINI_STATUS_PROXY_REQUEST_REFUSED, error, -1);
+		goto exit;
+	}
+	free(part);
+
+	if (curl_url_get(url, CURLUPART_HOST, &part, 0) != CURLUE_OK) {
+		const char *error = "Protocol error: invalid URL (expected host)";
+		client_submit_response(client,
+			GEMINI_STATUS_BAD_REQUEST, error, -1);
+		goto exit;
+	} else if (strcmp(part, client->host->hostname) != 0) {
+		free(part);
+		const char *error = "Protocol error: hostname does not match SNI";
+		client_submit_response(client,
+			GEMINI_STATUS_BAD_REQUEST, error, -1);
+		goto exit;
+	}
+	free(part);
+
+	if (curl_url_get(url, CURLUPART_PATH, &part, 0) != CURLUE_OK) {
+		const char *error = "Protocol error: invalid URL (expected path)";
+		client_submit_response(client,
+			GEMINI_STATUS_BAD_REQUEST, error, -1);
+		goto exit;
+	}
+	// NOTE: curl_url_set(..., CURLUPART_URL, ..., 0) will consoldate .. and
+	// . to prevent directory traversal without additional code.
+	*path = part;
+
+exit:
+	curl_url_cleanup(url);
+	return true;
 }
 
 static void
@@ -200,7 +311,14 @@ client_readable(struct gmnisrv_server *server, struct gmnisrv_client *client)
 	if (!client->ssl && client_init_ssl(server, client) != 0) {
 		return;
 	}
+	if (!client->host) {
+		const char *error = "This server requires clients to support the TLS SNI (server name identification) extension";
+		client_submit_response(client,
+			GEMINI_STATUS_BAD_REQUEST, error, -1);
+		return;
+	}
 
+	// XXX: Can buf be statically allocated?
 	int r = BIO_gets(client->bio, client->buf, sizeof(client->buf));
 	if (r <= 0) {
 		r = SSL_get_error(client->ssl, r);
@@ -214,32 +332,66 @@ client_readable(struct gmnisrv_server *server, struct gmnisrv_client *client)
 	}
 	client->buf[r] = '\0';
 
-	if (!client->host) {
-		// TODO: We can do a friendly disconnect at this point
-		client_error(&client->addr,
-			"client did not perform SNI, disconnecting");
-		disconnect_client(server, client);
-		return;
-	}
-
 	char *newline = strstr(client->buf, "\r\n");
 	if (!newline) {
-		// TODO: We can do a friendly disconnect at this point
-		client_error(&client->addr, "protocol error, disconnecting");
-		disconnect_client(server, client);
+		const char *error = "Protocol error: malformed request";
+		client_submit_response(client,
+			GEMINI_STATUS_BAD_REQUEST, error, -1);
 		return;
 	}
 	*newline = 0;
 
-	client_log(&client->addr, "%s", client->buf);
+	if (!request_validate(client, &client->path)) {
+		return;
+	}
+
+	// TODO: prep response
+	const char *error = "TODO: Finish implementation";
+	client_submit_response(client,
+		GEMINI_STATUS_TEMPORARY_FAILURE, error, -1);
 }
 
 static void
 client_writable(struct gmnisrv_server *server, struct gmnisrv_client *client)
 {
-	// TODO
+	int r;
+	ssize_t n;
+	switch (client->state) {
+	case RESPOND_HEADER:
+		if (client->bufix == 0) {
+			assert(strlen(client->meta) <= 1024);
+			n = snprintf(client->buf, sizeof(client->buf),
+				"%02d %s\r\n", (int)client->status,
+				client->meta);
+			assert(n > 0);
+			client->bufln = n;
+		}
+		r = BIO_write(client->sbio, &client->buf[client->bufix],
+			client->bufln - client->bufix);
+		if (r <= 0) {
+			r = SSL_get_error(client->ssl, r);
+			if (r == SSL_ERROR_WANT_WRITE) {
+				return;
+			}
+			client->status = GEMINI_STATUS_NONE;
+			client_error(&client->addr, "SSL read error %s, disconnecting",
+					ERR_error_string(r, NULL));
+			disconnect_client(server, client);
+			return;
+		}
+		client->bufix += r;
+		if (client->bufix >= client->bufln) {
+			// TODO: Start sending response body as well
+			disconnect_client(server, client);
+			return;
+		}
+		break;
+	case RESPOND_BODY:
+		assert(0);
+		break;
+	}
+
 	(void)server;
-	(void)client;
 }
 
 static long
