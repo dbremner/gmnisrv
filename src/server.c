@@ -238,29 +238,34 @@ client_init_ssl(struct gmnisrv_server *server, struct gmnisrv_client *client)
 	return 0;
 }
 
-static void
+enum client_state {
+	CLIENT_CONNECTED,
+	CLIENT_DISCONNECTED,
+};
+
+static enum client_state
 client_readable(struct gmnisrv_server *server, struct gmnisrv_client *client)
 {
 	if (!client->ssl && client_init_ssl(server, client) != 0) {
-		return;
+		return CLIENT_DISCONNECTED;
 	}
 	if (!client->host) {
 		const char *error = "This server requires clients to support the TLS SNI (server name identification) extension";
 		client_submit_response(client,
 			GEMINI_STATUS_BAD_REQUEST, error, NULL);
-		return;
+		return CLIENT_CONNECTED;
 	}
 
 	int r = BIO_gets(client->bio, client->buf, sizeof(client->buf));
 	if (r <= 0) {
 		r = SSL_get_error(client->ssl, r);
 		if (r == SSL_ERROR_WANT_READ) {
-			return;
+			return CLIENT_CONNECTED;
 		}
 		client_error(&client->addr, "SSL read error %s, disconnecting",
 				ERR_error_string(r, NULL));
 		disconnect_client(server, client);
-		return;
+		return CLIENT_DISCONNECTED;
 	}
 	client->buf[r] = '\0';
 
@@ -269,18 +274,19 @@ client_readable(struct gmnisrv_server *server, struct gmnisrv_client *client)
 		const char *error = "Protocol error: malformed request";
 		client_submit_response(client,
 			GEMINI_STATUS_BAD_REQUEST, error, NULL);
-		return;
+		return CLIENT_CONNECTED;
 	}
 	*newline = 0;
 
 	if (!request_validate(client, &client->path)) {
-		return;
+		return CLIENT_CONNECTED;
 	}
 
 	serve_request(client);
+	return CLIENT_CONNECTED;
 }
 
-static void
+static enum client_state
 client_writable(struct gmnisrv_server *server, struct gmnisrv_client *client)
 {
 	int r;
@@ -300,24 +306,25 @@ client_writable(struct gmnisrv_server *server, struct gmnisrv_client *client)
 		if (r <= 0) {
 			r = SSL_get_error(client->ssl, r);
 			if (r == SSL_ERROR_WANT_WRITE) {
-				return;
+				return CLIENT_CONNECTED;
 			}
 			client->status = GEMINI_STATUS_NONE;
 			client_error(&client->addr,
 				"header write error %s, disconnecting",
 				ERR_error_string(r, NULL));
 			disconnect_client(server, client);
-			return;
+			return CLIENT_DISCONNECTED;
 		}
 		client->bufix += r;
 		if (client->bufix >= client->bufln) {
 			if (!client->body) {
 				disconnect_client(server, client);
+				return CLIENT_DISCONNECTED;
 			} else {
 				client->state = RESPOND_BODY;
 				client->bufix = client->bufln = 0;
+				return CLIENT_CONNECTED;
 			}
-			return;
 		}
 		break;
 	case RESPOND_BODY:
@@ -329,12 +336,12 @@ client_writable(struct gmnisrv_server *server, struct gmnisrv_client *client)
 					"Error reading response body: %s",
 					strerror(errno));
 				disconnect_client(server, client);
-				return;
+				return CLIENT_DISCONNECTED;
 			}
 			if (n == 0) {
 				// EOF
 				disconnect_client(server, client);
-				return;
+				return CLIENT_DISCONNECTED;
 			}
 			client->bbytes += n;
 			client->bufln = n;
@@ -345,17 +352,18 @@ client_writable(struct gmnisrv_server *server, struct gmnisrv_client *client)
 		if (r <= 0) {
 			r = SSL_get_error(client->ssl, r);
 			if (r == SSL_ERROR_WANT_WRITE) {
-				return;
+				return CLIENT_CONNECTED;
 			}
 			client->status = GEMINI_STATUS_NONE;
 			client_error(&client->addr, "body write error %s, disconnecting",
 					ERR_error_string(r, NULL));
 			disconnect_client(server, client);
-			return;
+			return CLIENT_DISCONNECTED;
 		}
 		client->bufix += r;
 		break;
 	}
+	return false;
 }
 
 static long
@@ -441,15 +449,20 @@ server_run(struct gmnisrv_server *server)
 		}
 
 		for (size_t i = 0; i < server->nclients; ++i) {
-			if ((server->fds[server->nlisten + i].revents & (POLLHUP | POLLERR))) {
+			int pi = i + server->nlisten;
+			enum client_state s = CLIENT_CONNECTED;
+			if ((server->fds[pi].revents & (POLLHUP | POLLERR))) {
 				disconnect_client(server, &server->clients[i]);
-				break;
-			} else if ((server->fds[server->nlisten + i].revents & POLLIN)) {
-				client_readable(server, &server->clients[i]);
-				break;
-			} else if ((server->fds[server->nlisten + i].revents & POLLOUT)) {
-				client_writable(server, &server->clients[i]);
-				break;
+				s = CLIENT_DISCONNECTED;
+			}
+			if (s == CLIENT_CONNECTED && (server->fds[pi].revents & POLLIN)) {
+				s = client_readable(server, &server->clients[i]);
+			}
+			if (s == CLIENT_CONNECTED && (server->fds[pi].revents & POLLOUT)) {
+				s = client_writable(server, &server->clients[i]);
+			}
+			if (s == CLIENT_DISCONNECTED) {
+				--i;
 			}
 		}
 	} while (server->run);
