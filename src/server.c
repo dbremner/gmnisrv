@@ -443,10 +443,13 @@ server_run(struct gmnisrv_server *server)
 		for (size_t i = 0; i < server->nclients; ++i) {
 			if ((server->fds[server->nlisten + i].revents & (POLLHUP | POLLERR))) {
 				disconnect_client(server, &server->clients[i]);
+				break;
 			} else if ((server->fds[server->nlisten + i].revents & POLLIN)) {
 				client_readable(server, &server->clients[i]);
+				break;
 			} else if ((server->fds[server->nlisten + i].revents & POLLOUT)) {
 				client_writable(server, &server->clients[i]);
+				break;
 			}
 		}
 	} while (server->run);
