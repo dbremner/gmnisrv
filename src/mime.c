@@ -23,6 +23,9 @@ gmnisrv_mimetype_for_path(const char *path)
 	if (has_suffix(path, ".txt")) {
 		return "text/plain";
 	}
+	if (has_suffix(path, ".xml")) {
+		return "text/xml";
+	}
 	if (has_suffix(path, ".png")) {
 		return "image/png";
 	}
