@@ -322,8 +322,8 @@ client_writable(struct gmnisrv_server *server, struct gmnisrv_client *client)
 		break;
 	case RESPOND_BODY:
 		if (client->bufix >= client->bufln) {
-			n = fread(client->buf, 1,
-				sizeof(client->buf), client->body);
+			n = fread(client->buf, 1, sizeof(client->buf),
+				client->body);
 			if (n == -1) {
 				client_error(&client->addr,
 					"Error reading response body: %s",
@@ -443,13 +443,9 @@ server_run(struct gmnisrv_server *server)
 		for (size_t i = 0; i < server->nclients; ++i) {
 			if ((server->fds[server->nlisten + i].revents & (POLLHUP | POLLERR))) {
 				disconnect_client(server, &server->clients[i]);
-				--i;
-				continue;
-			}
-			if ((server->fds[server->nlisten + i].revents & POLLIN)) {
+			} else if ((server->fds[server->nlisten + i].revents & POLLIN)) {
 				client_readable(server, &server->clients[i]);
-			}
-			if ((server->fds[server->nlisten + i].revents & POLLOUT)) {
+			} else if ((server->fds[server->nlisten + i].revents & POLLOUT)) {
 				client_writable(server, &server->clients[i]);
 			}
 		}
