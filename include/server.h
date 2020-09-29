@@ -27,7 +27,7 @@ struct gmnisrv_client {
 	BIO *bio, *sbio;
 
 	char buf[4096];
-	static_assert(GEMINI_MAX_URL + 3 < 4096);
+	static_assert(GEMINI_MAX_URL + 3 < 4096, "GEMINI_MAX_URL is too high");
 	size_t bufix, bufln;
 
 	enum response_state state;
