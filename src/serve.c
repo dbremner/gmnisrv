@@ -247,7 +247,10 @@ request_validate(struct gmnisrv_client *client, char **path)
 	// . to prevent directory traversal without additional code.
 	*path = part;
 
-exit:
 	curl_url_cleanup(url);
 	return true;
+
+exit:
+	curl_url_cleanup(url);
+	return false;
 }
