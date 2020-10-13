@@ -56,8 +56,7 @@ serve_autoindex(struct gmnisrv_client *client, const char *path)
 	errno = 0;
 	while ((ent = readdir(dirp)) != NULL) {
 		char fpath[PATH_MAX + 1];
-		strcpy(fpath, path);
-		strncat(fpath, ent->d_name, sizeof(fpath)-1);
+		snprintf(fpath, sizeof(fpath), "%s/%s", path, ent->d_name);
 
 		struct stat st;
 		if (stat(fpath, &st) != 0) {
