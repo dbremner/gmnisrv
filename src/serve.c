@@ -18,6 +18,7 @@ void
 client_submit_response(struct gmnisrv_client *client,
 	enum gemini_status status, const char *meta, FILE *body)
 {
+	client->state = CLIENT_STATE_HEADER;
 	client->status = status;
 	client->meta = strdup(meta);
 	client->body = body;

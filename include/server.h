@@ -10,9 +10,11 @@
 
 struct gmnisrv_server;
 
-enum response_state {
-	RESPOND_HEADER,
-	RESPOND_BODY,
+enum client_state {
+	CLIENT_STATE_REQUEST,
+	CLIENT_STATE_SSL,
+	CLIENT_STATE_HEADER,
+	CLIENT_STATE_BODY,
 };
 
 struct gmnisrv_client {
@@ -24,13 +26,12 @@ struct gmnisrv_client {
 	struct pollfd *pollfd;
 
 	SSL *ssl;
-	BIO *bio, *sbio;
+	BIO *rbio, *wbio;
 
 	char buf[4096];
-	static_assert(GEMINI_MAX_URL + 3 < 4096, "GEMINI_MAX_URL is too high");
 	size_t bufix, bufln;
 
-	enum response_state state;
+	enum client_state state, next;
 	enum gemini_status status;
 	char *meta;
 	FILE *body;

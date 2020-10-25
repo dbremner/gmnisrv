@@ -161,12 +161,31 @@ tls_init(struct gmnisrv_config *conf)
 	SSL_load_error_strings();
 	ERR_load_crypto_strings();
 
-	conf->tls.ssl_ctx = SSL_CTX_new(TLS_method());
+	conf->tls.ssl_ctx = SSL_CTX_new(TLS_server_method());
 	assert(conf->tls.ssl_ctx);
+
+	int r = SSL_CTX_set_min_proto_version(conf->tls.ssl_ctx, TLS1_2_VERSION);
+	assert(r == 1);
+
+	r = SSL_CTX_set_cipher_list(conf->tls.ssl_ctx,
+		"ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:"
+		"ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:"
+		"ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:"
+		"DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:"
+		"TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:"
+		"TLS_CHACHA20_POLY1305_SHA256");
+	assert(r == 1);
 
 	SSL_CTX_set_tlsext_servername_callback(conf->tls.ssl_ctx, NULL);
 
-	int r;
+	// TLS re-negotiation is a fucking STUPID idea
+	// I'm gating this behind an #ifdef based on an optimistic assumption
+	// that someday it will be removed from OpenSSL entirely because of how
+	// fucking stupid this fucking godawful idea is
+#ifdef SSL_OP_NO_RENEGOTIATION
+	SSL_CTX_set_options(conf->tls.ssl_ctx, SSL_OP_NO_RENEGOTIATION);
+#endif
+
 	for (struct gmnisrv_host *host = conf->hosts; host; host = host->next) {
 		r = tls_host_init(&conf->tls, host);
 		if (r != 0) {
@@ -188,15 +207,9 @@ tls_finish(struct gmnisrv_config *conf)
 }
 
 SSL *
-tls_get_ssl(struct gmnisrv_config *conf, int fd)
+tls_get_ssl(struct gmnisrv_config *conf)
 {
-	SSL *ssl = SSL_new(conf->tls.ssl_ctx);
-	if (!ssl) {
-		return NULL;
-	}
-	int r = SSL_set_fd(ssl, fd);
-	assert(r == 1);
-	return ssl;
+	return SSL_new(conf->tls.ssl_ctx);
 }
 
 void
