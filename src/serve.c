@@ -117,15 +117,60 @@ internal_error:
 	goto exit;
 }
 
+static bool
+route_match(struct gmnisrv_route *route, const char *path, const char **revised)
+{
+	switch (route->routing) {
+	case ROUTE_PATH:;
+		size_t l = strlen(route->path);
+		if (strncmp(path, route->path, l) != 0) {
+			return false;
+		}
+		if (route->path[l-1] != '/' && path[l] != '\0' && path[l] != '/') {
+			// Prevents path == "/foobar" from matching
+			// route == "/foo":
+			return false;
+		}
+		if (route->path[l-1] == '/') {
+			*revised = &path[l-1];
+		} else {
+			*revised = &path[l];
+		}
+		return true;
+	case ROUTE_REGEX:
+		assert(0); // TODO
+	}
+
+	assert(0); // Invariant
+}
+
 void
 serve_request(struct gmnisrv_client *client)
 {
 	struct gmnisrv_host *host = client->host;
 	assert(host);
-	assert(host->root); // TODO: reverse proxy support
+	struct gmnisrv_route *route = host->routes;
+	assert(route);
+
+	const char *url_path;
+	while (route) {
+		if (route_match(route, client->path, &url_path)) {
+			break;
+		}
+
+		route = route->next;
+	}
+
+	if (!route) {
+		client_submit_response(client,
+			GEMINI_STATUS_NOT_FOUND, "Not found", NULL);
+		return;
+	}
+
+	assert(route->root); // TODO: reverse proxy support
 
 	char path[PATH_MAX + 1];
-	int n = snprintf(path, sizeof(path), "%s%s", host->root, client->path);
+	int n = snprintf(path, sizeof(path), "%s%s", route->root, url_path);
 	if ((size_t)n >= sizeof(path)) {
 		client_submit_response(client, GEMINI_STATUS_PERMANENT_FAILURE,
 			"Request path exceeds PATH_MAX", NULL);
@@ -142,12 +187,12 @@ serve_request(struct gmnisrv_client *client)
 		}
 
 		if (S_ISDIR(st.st_mode)) {
-			if (host->autoindex) {
+			if (route->autoindex) {
 				serve_autoindex(client, path);
 				return;
 			} else {
 				strncat(path,
-					host->index ? host->index : "index.gmi",
+					route->index ? route->index : "index.gmi",
 					sizeof(path) - 1);
 			}
 		} else if (S_ISLNK(st.st_mode)) {

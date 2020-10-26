@@ -2,6 +2,7 @@
 #define GMNISRV_CONFIG
 #include <arpa/inet.h>
 #include <openssl/x509.h>
+#include <regex.h>
 #include <stdbool.h>
 
 struct gmnisrv_tls {
@@ -10,14 +11,32 @@ struct gmnisrv_tls {
 	SSL_CTX *ssl_ctx;
 };
 
-struct gmnisrv_host {
-	char *hostname;
+enum gmnisrv_routing {
+	ROUTE_PATH,
+	ROUTE_REGEX,
+};
+
+struct gmnisrv_route {
+	enum gmnisrv_routing routing;
+	char *spec;
+	union {
+		char *path;
+		regex_t *regex;
+	};
+
 	char *root;
 	char *index;
 	bool autoindex;
 
+	struct gmnisrv_route *next;
+};
+
+struct gmnisrv_host {
+	char *hostname;
 	X509 *x509;
 	EVP_PKEY *pkey;
+
+	struct gmnisrv_route *routes;
 
 	struct gmnisrv_host *next;
 };

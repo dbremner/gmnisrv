@@ -21,6 +21,21 @@ gmnisrv_config_get_host(struct gmnisrv_config *conf, const char *hostname)
 	return NULL;
 }
 
+struct gmnisrv_route *
+gmnisrv_host_get_route(struct gmnisrv_host *host,
+		enum gmnisrv_routing routing, const char *spec)
+{
+	struct gmnisrv_route *route = host->routes;
+	while (route) {
+		if (route->routing == routing
+				&& strcmp(route->spec, spec) == 0) {
+			return route;
+		}
+		route = route->next;
+	}
+	return NULL;
+}
+
 static int
 parse_listen(struct gmnisrv_config *conf, const char *value)
 {
@@ -133,7 +148,29 @@ conf_ini_handler(void *user, const char *section,
 		return 0;
 	}
 
-	struct gmnisrv_host *host = gmnisrv_config_get_host(conf, section);
+	const char *spec;
+	char hostname[1024 + 1];
+	enum gmnisrv_routing routing;
+	size_t hostln = strcspn(section, ":~");
+	switch (section[hostln]) {
+	case '\0':
+		routing = ROUTE_PATH;
+		spec = "/";
+		break;
+	case ':':
+		routing = ROUTE_PATH;
+		spec = &section[hostln + 1];
+		break;
+	case '~':
+		routing = ROUTE_REGEX;
+		spec = &section[hostln + 1];
+		break;
+	}
+	assert(hostln < sizeof(hostname));
+	strncpy(hostname, section, hostln);
+	hostname[hostln] = '\0';
+
+	struct gmnisrv_host *host = gmnisrv_config_get_host(conf, hostname);
 	if (!host) {
 		host = calloc(1, sizeof(struct gmnisrv_host));
 		assert(host);
@@ -142,33 +179,52 @@ conf_ini_handler(void *user, const char *section,
 		conf->hosts = host;
 	}
 
+	struct gmnisrv_route *route =
+		gmnisrv_host_get_route(host, routing, spec);
+	if (!route) {
+		route = calloc(1, sizeof(struct gmnisrv_route));
+		assert(route);
+		route->spec = strdup(spec);
+		route->routing = routing;
+		route->next = host->routes;
+		host->routes = route;
+
+		switch (route->routing) {
+		case ROUTE_PATH:
+			route->path = strdup(spec);
+			break;
+		case ROUTE_REGEX:
+			assert(0); // TODO
+		}
+	}
+
 	struct {
 		char *name;
 		char **value;
-	} host_strvars[] = {
-		{ "root", &host->root },
-		{ "index", &host->index },
+	} route_strvars[] = {
+		{ "root", &route->root },
+		{ "index", &route->index },
 	};
 	struct {
 		char *name;
 		bool *value;
-	} host_bvars[] = {
-		{ "autoindex", &host->autoindex },
+	} route_bvars[] = {
+		{ "autoindex", &route->autoindex },
 	};
 
-	for (size_t i = 0; i < sizeof(host_strvars) / sizeof(host_strvars[0]); ++i) {
-		if (strcmp(host_strvars[i].name, name) != 0) {
+	for (size_t i = 0; i < sizeof(route_strvars) / sizeof(route_strvars[0]); ++i) {
+		if (strcmp(route_strvars[i].name, name) != 0) {
 			continue;
 		}
-		*host_strvars[i].value = strdup(value);
+		*route_strvars[i].value = strdup(value);
 		return 1;
 	}
 
-	for (size_t i = 0; i < sizeof(host_bvars) / sizeof(host_bvars[0]); ++i) {
-		if (strcmp(host_bvars[i].name, name) != 0) {
+	for (size_t i = 0; i < sizeof(route_bvars) / sizeof(route_bvars[0]); ++i) {
+		if (strcmp(route_bvars[i].name, name) != 0) {
 			continue;
 		}
-		*host_bvars[i].value =
+		*route_bvars[i].value =
 			strcasecmp(value, "yes") == 0 ||
 			strcasecmp(value, "true") == 0 ||
 			strcasecmp(value, "on") == 0;
@@ -233,8 +289,15 @@ config_finish(struct gmnisrv_config *conf)
 	while (host) {
 		struct gmnisrv_host *next = host->next;
 		free(host->hostname);
-		free(host->root);
-		free(host->index);
+
+		struct gmnisrv_route *route = host->routes;
+		while (route) {
+			struct gmnisrv_route *rnext = route->next;
+			free(route->root);
+			free(route->index);
+			free(route);
+			route = rnext;
+		}
 		free(host);
 		host = next;
 	}

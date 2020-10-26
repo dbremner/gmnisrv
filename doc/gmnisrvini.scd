@@ -42,15 +42,46 @@ The following keys are accepted under the *[:tls]* section:
 	the name of the organization responsible for the host and it will be
 	filled in as the X.509 /O name.
 
-## HOST KEYS
+## ROUTING KEYS
 
-Hosts that *gmnisrv* is to serve shall be defined in *gmnisrv.ini* by
-introducing config sections named after each host to provide service for. The
-following keys apply:
+To configure *gmnisrv* to service requests, routing keys must be defined. The
+name of the configuration section is used to determine what kinds of requests it
+configures.
+
+The format of the section name is the _hostname_ to be serviced, followed by a
+token which defines the routing strategy, and a string whose format is specific
+to each routing strategy. The token and match string may be omitted
+(i.e. [_hostname_] alone), which implies path routing against "/".
+
+|] *:*
+:< Route by path prefix. The URL path is compared to "_string_/".
+|  *=*
+:  Exact match. The URL path must exactly match the string.
+|  *~*
+:  Regular expression routing. The string is a JavaScript-compatible regular
+   expression which is tested against the URL path.
+
+Some example section names and examples of matching paths:
+
+|[ *[example.org:/foo]*
+:< /foo, /foo/bar, /foo/bar/baz
+|  *[example.org=/foo.txt]*
+:  /foo.txt
+|  *[example.org~/[a-z]+\\.(png|jpg|webp)*
+:  /foo.png, /bar.webp
+
+Routes should be ordered from least to most specific. The matching algorithm
+attempts to match the URL against each route in reverse order, and chooses the
+first route which matches.
+
+Within each routing section, the following keys are used to configure how
+*gmnisrv* will respond to matching requests:
 
 *root*
 	Configures the path on disk from which files shall be served for this
-	host.
+	host. If using path prefix matching, the prefix is trimmed, so if
+	example.org/foo/bar.txt is requested and matches *[example.org:/foo]*,
+	"bar.txt" will be appended to the root to form the file path.
 
 *index*
 	Configures the name of the index file which shall be served in the event
