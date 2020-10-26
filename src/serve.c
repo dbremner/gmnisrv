@@ -3,6 +3,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <libgen.h>
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
@@ -120,7 +121,7 @@ internal_error:
 }
 
 static void
-serve_cgi(struct gmnisrv_client *client, const char *path)
+serve_cgi(struct gmnisrv_client *client, const char *path, const char *pathinfo)
 {
 	int pfd[2];
 	if (pipe(pfd) == -1) {
@@ -170,7 +171,7 @@ serve_cgi(struct gmnisrv_client *client, const char *path)
 		setenv("SERVER_SOFTWARE", "gmnisrv/0.0.0", 1);
 		setenv("GEMINI_URL", client->buf, 1);
 		setenv("SCRIPT_NAME", path, 1);
-		//setenv("PATH_INFO", "", 1); // TODO
+		setenv("PATH_INFO", pathinfo, 1);
 		setenv("SERVER_NAME", client->host->hostname, 1);
 		setenv("HOSTNAME", client->host->hostname, 1);
 		//setenv("SERVER_PORT", "", 1); // TODO
@@ -247,18 +248,50 @@ serve_request(struct gmnisrv_client *client)
 
 	assert(route->root); // TODO: reverse proxy support
 
-	char path[PATH_MAX + 1];
-	int n = snprintf(path, sizeof(path), "%s%s", route->root, url_path);
-	if ((size_t)n >= sizeof(path)) {
+	// Paths on paths on paths on paths
+	// My apologies to the stack
+	char client_path[PATH_MAX + 1] = "";
+	char real_path[PATH_MAX + 1] = "";
+	char pathinfo[PATH_MAX + 1] = "";
+	char temp_path[PATH_MAX + 1] = "";
+	int n = snprintf(real_path, sizeof(real_path), "%s%s", route->root, url_path);
+	if ((size_t)n >= sizeof(real_path)) {
 		client_submit_response(client, GEMINI_STATUS_PERMANENT_FAILURE,
 			"Request path exceeds PATH_MAX", NULL);
 		return;
 	}
+	strcpy(client_path, client->path);
 
 	int nlinks = 0;
 	struct stat st;
 	while (true) {
-		if ((n = stat(path, &st)) != 0) {
+		if ((n = stat(real_path, &st)) != 0) {
+			if (route->cgi) {
+				const char *new;
+				strcpy(temp_path, client_path);
+				new = basename((char *)temp_path);
+
+				size_t l = strlen(new), q = strlen(pathinfo);
+				memmove(&pathinfo[l + 1], pathinfo, q);
+				pathinfo[0] = '/';
+				memcpy(&pathinfo[1], new, l);
+
+				strcpy(temp_path, client_path);
+				new = dirname((char *)temp_path);
+				strcpy(client_path, new);
+
+				strcpy(temp_path, real_path);
+				new = dirname((char *)temp_path);
+				strcpy(real_path, new);
+
+				if (route_match(route, client_path, &url_path)) {
+					n = snprintf(real_path, sizeof(real_path),
+						"%s%s", route->root, url_path);
+					assert((size_t)n < sizeof(real_path));
+					continue;
+				}
+			}
+
 			client_submit_response(client,
 				GEMINI_STATUS_NOT_FOUND, "Not found", NULL);
 			return;
@@ -266,12 +299,12 @@ serve_request(struct gmnisrv_client *client)
 
 		if (S_ISDIR(st.st_mode)) {
 			if (route->autoindex) {
-				serve_autoindex(client, path);
+				serve_autoindex(client, real_path);
 				return;
 			} else {
-				strncat(path,
+				strncat(real_path,
 					route->index ? route->index : "index.gmi",
-					sizeof(path) - 1);
+					sizeof(real_path) - 1);
 			}
 		} else if (S_ISLNK(st.st_mode)) {
 			++nlinks;
@@ -283,10 +316,9 @@ serve_request(struct gmnisrv_client *client)
 					"Not found", NULL);
 				return;
 			}
-			char path2[PATH_MAX + 1];
-			ssize_t s = readlink(path, path2, sizeof(path2));
+			ssize_t s = readlink(real_path, temp_path, sizeof(temp_path));
 			assert(s != -1);
-			strcpy(path, path2);
+			strcpy(real_path, temp_path);
 		} else if (S_ISREG(st.st_mode)) {
 			break;
 		} else {
@@ -298,11 +330,11 @@ serve_request(struct gmnisrv_client *client)
 	}
 
 	if (route->cgi) {
-		serve_cgi(client, path);
+		serve_cgi(client, real_path, (const char *)pathinfo);
 		return;
 	}
 
-	FILE *body = fopen(path, "r");
+	FILE *body = fopen(real_path, "r");
 	if (!body) {
 		if (errno == ENOENT) {
 			client_submit_response(client,
@@ -310,14 +342,14 @@ serve_request(struct gmnisrv_client *client)
 			return;
 		} else {
 			client_error(&client->addr, "error opening %s: %s",
-					path, strerror(errno));
+					real_path, strerror(errno));
 			client_submit_response(client, GEMINI_STATUS_PERMANENT_FAILURE,
 				"Internal server error", NULL);
 			return;
 		}
 	}
 
-	const char *meta = gmnisrv_mimetype_for_path(path);
+	const char *meta = gmnisrv_mimetype_for_path(real_path);
 	client_submit_response(client, GEMINI_STATUS_SUCCESS, meta, body);
 }
 
