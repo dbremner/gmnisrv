@@ -121,7 +121,8 @@ internal_error:
 }
 
 static void
-serve_cgi(struct gmnisrv_client *client, const char *path, const char *pathinfo)
+serve_cgi(struct gmnisrv_client *client, const char *path,
+		const char *script_name, const char *pathinfo)
 {
 	int pfd[2];
 	if (pipe(pfd) == -1) {
@@ -170,7 +171,7 @@ serve_cgi(struct gmnisrv_client *client, const char *path, const char *pathinfo)
 		setenv("SERVER_PROTOCOL", "GEMINI", 1);
 		setenv("SERVER_SOFTWARE", "gmnisrv/0.0.0", 1);
 		setenv("GEMINI_URL", client->buf, 1);
-		setenv("SCRIPT_NAME", path, 1);
+		setenv("SCRIPT_NAME", script_name, 1);
 		setenv("PATH_INFO", pathinfo, 1);
 		setenv("SERVER_NAME", client->host->hostname, 1);
 		setenv("HOSTNAME", client->host->hostname, 1);
@@ -330,7 +331,9 @@ serve_request(struct gmnisrv_client *client)
 	}
 
 	if (route->cgi) {
-		serve_cgi(client, real_path, (const char *)pathinfo);
+		serve_cgi(client, real_path,
+			(const char *)client_path,
+			(const char *)pathinfo);
 		return;
 	}
 
