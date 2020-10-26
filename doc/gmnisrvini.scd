@@ -92,3 +92,64 @@ Within each routing section, the following keys are used to configure how
 	"on" to enable the auto-index feature, which presents clients with a
 	list of files in the requested directory when an index file cannot be
 	found. Off by default.
+
+*cgi*
+	"on" to enable CGI support. *root* must also be configured. See "CGI
+	Support" for details.
+
+# CGI Support
+
+*gmnisrv* supports a limited version of CGI, compatible with the Jetforce
+server. It is not a faithful implementation of RFC 3875, but is sufficient for
+most of the needs of Gemini servers.
+
+Set *cgi=on* for a route configuration to enable CGI for that route and set
+*root* to the path where the CGI scripts are found. If a client requests a
+script, it will be executed, and must print a Gemini response (including status
+code and meta) to stdout.
+
+The following environment variables will be set:
+
+[[ *Variable*
+:[ *Example*
+:< *Description*
+|  *GATEWAY_INTERFACE*
+:  GCI/1.1
+:  CGI version
+|  *SERVER_PROTOCOL*
+:  GEMINI
+:  The server protocol
+|  *SERVER_SOFTWARE*
+:  gmnisrv/0.0.0
+:  The gmnisrv server name and version
+|  *GEMINI_URL*
+:  See [1]
+:  The URL requested by the client
+|  *SCRIPT_NAME*
+:  /cgi-bin/foo.sh
+:  The portion of the URL referring to the script name.
+|  *PATH_INFO*
+:  /bar
+:  The remainder of the path following *SCRIPT_NAME*.
+|  *QUERY_STRING*
+:  hello=world
+:  The query string portion of the URL.
+|  *SERVER_NAME*, *HOSTNAME*
+:  example.org
+:  The server host name.
+|  *SERVER_PORT*
+:  1965
+:  The server port number.
+|  *REMOTE_HOST*, *REMOTE_ADDR*
+:  10.10.0.2
+:  The clients IP address.
+|  *TLS_CIPHER*
+:  TLS_AES_256_GCM_SHA384
+:  The negotiated TLS cipher.
+|  *TLS_VERSION*
+:  TLSv1.3
+:  The negotiated TLS version.
+
+\[1]: gemini://example.org/cgi-bin/foo.sh/bar?hello=world
+
+The exit status of the script is ignored.

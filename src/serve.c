@@ -1,3 +1,4 @@
+#include <arpa/inet.h>
 #include <assert.h>
 #include <dirent.h>
 #include <errno.h>
@@ -6,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
 #include "config.h"
 #include "gemini.h"
@@ -117,6 +119,82 @@ internal_error:
 	goto exit;
 }
 
+static void
+serve_cgi(struct gmnisrv_client *client, const char *path)
+{
+	int pfd[2];
+	if (pipe(pfd) == -1) {
+		server_error("pipe: %s", strerror(errno));
+		client_submit_response(client, GEMINI_STATUS_PERMANENT_FAILURE,
+			"Internal server error", NULL);
+		return;
+	}
+
+	pid_t pid = fork();
+	if (pid == -1) {
+		server_error("fork: %s", strerror(errno));
+		client_submit_response(client, GEMINI_STATUS_PERMANENT_FAILURE,
+			"Internal server error", NULL);
+		close(pfd[0]);
+		close(pfd[1]);
+		return;
+	} else if (pid == 0) {
+		close(pfd[0]);
+		dup2(pfd[1], STDOUT_FILENO);
+		close(pfd[1]);
+
+		// I don't feel like freeing this stuff and this process is
+		// going to die soon anyway so let's just be hip and call it an
+		// arena allocator :^)
+		struct Curl_URL *url = curl_url();
+		assert(url);
+		CURLUcode uc = curl_url_set(url, CURLUPART_URL, client->buf, 0);
+		assert(uc == CURLUE_OK);
+
+		char *query;
+		uc = curl_url_get(url, CURLUPART_QUERY, &query, CURLU_URLDECODE);
+		if (uc != CURLUE_OK) {
+			assert(uc == CURLUE_NO_QUERY);
+		} else {
+			setenv("QUERY_STRING", query, 1);
+		}
+
+		char abuf[INET6_ADDRSTRLEN + 1];
+		const char *addrs = inet_ntop(client->addr.sa_family,
+			client->addr.sa_data, abuf, sizeof(abuf));
+		assert(addrs);
+
+		// Compatible with Jetforce
+		setenv("GATEWAY_INTERFACE", "GCI/1.1", 1);
+		setenv("SERVER_PROTOCOL", "GEMINI", 1);
+		setenv("SERVER_SOFTWARE", "gmnisrv/0.0.0", 1);
+		setenv("GEMINI_URL", client->buf, 1);
+		setenv("SCRIPT_NAME", path, 1);
+		//setenv("PATH_INFO", "", 1); // TODO
+		setenv("SERVER_NAME", client->host->hostname, 1);
+		setenv("HOSTNAME", client->host->hostname, 1);
+		//setenv("SERVER_PORT", "", 1); // TODO
+		setenv("REMOTE_HOST", addrs, 1);
+		setenv("REMOTE_ADDR", addrs, 1);
+
+		const SSL_CIPHER *cipher = SSL_get_current_cipher(client->ssl);
+		setenv("TLS_CIPHER", SSL_CIPHER_get_name(cipher), 1);
+		setenv("TLS_VERSION", SSL_CIPHER_get_version(cipher), 1);
+
+		// TODO: Client certificate details
+
+		execlp(path, path, NULL);
+		server_error("execlp: %s", strerror(errno));
+		_exit(1);
+	} else {
+		close(pfd[1]);
+		FILE *f = fdopen(pfd[0], "r");
+		client_submit_response(client, GEMINI_STATUS_SUCCESS, "(cgi)", f);
+		client->state = CLIENT_STATE_BODY; // The CGI script sends meta
+		client->bufix = client->bufln = 0;
+	}
+}
+
 static bool
 route_match(struct gmnisrv_route *route, const char *path, const char **revised)
 {
@@ -217,6 +295,11 @@ serve_request(struct gmnisrv_client *client)
 				GEMINI_STATUS_NOT_FOUND, "Not found", NULL);
 			return;
 		}
+	}
+
+	if (route->cgi) {
+		serve_cgi(client, path);
+		return;
 	}
 
 	FILE *body = fopen(path, "r");

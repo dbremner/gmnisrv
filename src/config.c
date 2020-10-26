@@ -210,6 +210,7 @@ conf_ini_handler(void *user, const char *section,
 		bool *value;
 	} route_bvars[] = {
 		{ "autoindex", &route->autoindex },
+		{ "cgi", &route->cgi },
 	};
 
 	for (size_t i = 0; i < sizeof(route_strvars) / sizeof(route_strvars[0]); ++i) {
