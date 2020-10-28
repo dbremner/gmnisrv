@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <errno.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -29,7 +30,12 @@ mime_init()
 	mimedb = malloc(mimedb_sz * sizeof(struct mime_info));
 
 	FILE *f = fopen(MIMEDB, "r");
-	assert(f);
+	if (!f) {
+		fprintf(stderr, "Unable to open MIME database for reading: %s\n",
+			strerror(errno));
+		fprintf(stderr, "Is " MIMEDB " installed?\n");
+		assert(0);
+	}
 
 	char *line = NULL;
 	size_t n = 0;
