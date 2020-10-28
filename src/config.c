@@ -286,6 +286,7 @@ config_finish(struct gmnisrv_config *conf)
 		free(bind);
 		bind = next;
 	}
+
 	struct gmnisrv_host *host = conf->hosts;
 	while (host) {
 		struct gmnisrv_host *next = host->next;
@@ -293,12 +294,22 @@ config_finish(struct gmnisrv_config *conf)
 
 		struct gmnisrv_route *route = host->routes;
 		while (route) {
+			switch (route->routing) {
+			case ROUTE_PATH:
+				free(route->path);
+				break;
+			case ROUTE_REGEX:
+				assert(0); // TODO
+			}
+
 			struct gmnisrv_route *rnext = route->next;
+			free(route->spec);
 			free(route->root);
 			free(route->index);
 			free(route);
 			route = rnext;
 		}
+
 		free(host);
 		host = next;
 	}
