@@ -463,7 +463,11 @@ client_writable(struct gmnisrv_server *server, struct gmnisrv_client *client)
 		for (int w = 0; w < r; ) {
 			int q = write(client->sockfd, &buf[w], r - w);
 			if (q < 0) {
-				assert(0); // TODO: handle write errors
+				client_error(&client->addr,
+					"client write: %s",
+					strerror(errno));
+				disconnect_client(server, client);
+				return DISCONNECTED;
 			}
 			w += q;
 		}
