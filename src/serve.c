@@ -352,7 +352,7 @@ serve_request(struct gmnisrv_client *client)
 		}
 	}
 
-	const char *meta = gmnisrv_mimetype_for_path(real_path);
+	const char *meta = mimetype_for_path(real_path);
 	client_submit_response(client, GEMINI_STATUS_SUCCESS, meta, body);
 }
 

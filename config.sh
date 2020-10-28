@@ -32,6 +32,9 @@ do
 		--sysconfdir=*)
 			SYSCONFDIR=${arg#*=}
 			;;
+		--with-mimedb=*)
+			MIMEDB=${arg#*=}
+			;;
 	esac
 done
 
@@ -148,6 +151,7 @@ run_configure() {
 	LIBDIR?=${LIBDIR:-\$(PREFIX)/lib}
 	MANDIR?=${MANDIR:-\$(PREFIX)/share/man}
 	VARLIBDIR?=${MANDIR:-\$(PREFIX)/var/lib}
+	MIMEDB?=${MIMEDB:-${SYSCONFDIR:-/etc}/mime.types}
 	CACHE=\$(OUTDIR)/cache
 	CFLAGS=${CFLAGS}
 	CFLAGS+=-Iinclude -I\$(OUTDIR)
@@ -155,6 +159,7 @@ run_configure() {
 	CFLAGS+=-DLIBDIR='"\$(LIBDIR)"'
 	CFLAGS+=-DVARLIBDIR='"\$(VARLIBDIR)"'
 	CFLAGS+=-DSYSCONFDIR='"\$(SYSCONFDIR)"'
+	CFLAGS+=-DMIMEDB='"\$(MIMEDB)"'
 
 	all: ${all}
 	EOF

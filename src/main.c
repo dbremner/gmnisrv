@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include "config.h"
 #include "log.h"
+#include "mime.h"
 #include "server.h"
 #include "tls.h"
 
@@ -37,6 +38,8 @@ main(int argc, char **argv)
 		return 1;
 	}
 
+	mime_init();
+
 	int r = load_config(&conf, confpath);
 	if (r != 0) {
 		server_error("Config load failed");
@@ -62,5 +65,6 @@ exit_tls:
 exit_conf:
 	config_finish(&conf);
 exit:
+	mime_finish();
 	return 0;
 }
