@@ -7,6 +7,7 @@
 #include <strings.h>
 #include "config.h"
 #include "ini.h"
+#include "regex.h"
 
 struct gmnisrv_host *
 gmnisrv_config_get_host(struct gmnisrv_config *conf, const char *hostname)
@@ -179,6 +180,8 @@ conf_ini_handler(void *user, const char *section,
 		conf->hosts = host;
 	}
 
+	int bytecode_len;
+	char error_msg[64];
 	struct gmnisrv_route *route =
 		gmnisrv_host_get_route(host, routing, spec);
 	if (!route) {
@@ -194,7 +197,15 @@ conf_ini_handler(void *user, const char *section,
 			route->path = strdup(spec);
 			break;
 		case ROUTE_REGEX:
-			assert(0); // TODO
+			route->regex = lre_compile(&bytecode_len,
+				error_msg, sizeof(error_msg),
+				spec, strlen(spec), 0, NULL);
+			if (!route->regex) {
+				fprintf(stderr, "Error compiling regex '%s': %s\n",
+					spec, error_msg);
+				return 0;
+			}
+			break;
 		}
 	}
 
@@ -299,7 +310,8 @@ config_finish(struct gmnisrv_config *conf)
 				free(route->path);
 				break;
 			case ROUTE_REGEX:
-				assert(0); // TODO
+				free(route->regex);
+				break;
 			}
 
 			struct gmnisrv_route *rnext = route->next;

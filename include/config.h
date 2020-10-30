@@ -2,8 +2,8 @@
 #define GMNISRV_CONFIG
 #include <arpa/inet.h>
 #include <openssl/x509.h>
-#include <regex.h>
 #include <stdbool.h>
+#include "regexp.h"
 
 struct gmnisrv_tls {
 	char *store;
@@ -21,7 +21,7 @@ struct gmnisrv_route {
 	char *spec;
 	union {
 		char *path;
-		regex_t *regex;
+		uint8_t *regex;
 	};
 
 	char *root;
