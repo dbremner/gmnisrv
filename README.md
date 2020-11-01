@@ -8,6 +8,7 @@ Dependencies:
 
 - A C11 compiler and a POSIX-like system
 - OpenSSL
+- Mailcap (for /etc/mime.types)
 - [scdoc](https://git.sr.ht/~sircmpwn/scdoc) (optional)
 
 ```
