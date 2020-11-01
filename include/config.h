@@ -26,6 +26,7 @@ struct gmnisrv_route {
 
 	char *root;
 	char *index;
+	char *rewrite;
 	bool autoindex;
 	bool cgi;
 

@@ -197,6 +197,126 @@ serve_cgi(struct gmnisrv_client *client, const char *path,
 	}
 }
 
+static char *
+ensure_buf(char *buf, size_t *sz, size_t desired)
+{
+	while (*sz < desired) {
+		*sz = *sz * 2;
+		char *new = realloc(buf, *sz);
+		assert(new);
+		buf = new;
+	}
+	return buf;
+}
+
+static int
+get_group(struct gmnisrv_route *route, const char *name, int ncapture)
+{
+	const char *groupname = lre_get_groupnames(route->regex);
+	for (int i = 0; i < ncapture; groupname += strlen(groupname) + 1, ++i) {
+		if (strcmp(groupname, name) == 0) {
+			return i;
+		}
+	}
+	return -1;
+}
+
+static char *
+process_rewrites(struct gmnisrv_route *route, const char *path,
+		uint8_t **capture, int ncapture)
+{
+	if (!route->rewrite) {
+		return strdup(path);
+	}
+
+	size_t new_sz = strlen(path) * 2;
+	size_t new_ln = 0;
+	char *new = malloc(new_sz);
+	*new = '\0';
+
+	char *temp = strdup(route->rewrite);
+	char *rewrite = temp;
+	char *next;
+	do {
+		next = strchr(rewrite, '\\');
+
+		size_t len;
+		if (next) {
+			len = next - rewrite;
+			*next = '\0';
+		} else {
+			len = strlen(rewrite);
+		}
+
+		ensure_buf(new, &new_sz, new_ln + len);
+		strcat(new, rewrite);
+		new_ln += len;
+
+		if (!next) {
+			break;
+		}
+
+		int group;
+		char *endptr;
+		switch (next[1]) {
+		case '\0':
+			server_error("Misconfigured rewrite rule for route %s: expected capture group identifier",
+					route->spec);
+			return strdup(path);
+		case '{':;
+			char *rbrace = strchr(&next[1], '}');
+			if (!rbrace) {
+				server_error("Misconfigured rewrite rule for route %s: expected capture group terminator '}'", route->spec);
+				return strdup(path);
+			}
+			*rbrace = '\0';
+			group = get_group(route, &next[2], ncapture);
+			if (group == -1) {
+				server_error("Misconfigured rewrite rule for route %s: unknown capture group '%s'", route->spec, &next[2]);
+				return strdup(path);
+			}
+			++group;
+			endptr = &rbrace[1];
+			goto subgroup;
+		case '0':
+		case '1':
+		case '2':
+		case '3':
+		case '4':
+		case '5':
+		case '6':
+		case '7':
+		case '8':
+		case '9':;
+			group = (int)strtoul(&next[1], &endptr, 10);
+			if (group >= ncapture) {
+				server_error("Misconfigured rewrite rule for route %s: unknown capture group %d\n", group);
+				return strdup(path);
+			}
+subgroup:;
+			fprintf(stderr, "replace group %d\n", group);
+			char *start = (char *)capture[group * 2],
+				*end = (char *)capture[group * 2 + 1];
+
+			char c = *end;
+			*end = '\0';
+			len = strlen(start);
+			ensure_buf(new, &new_sz, new_ln + len);
+			strcat(new, start);
+			new_ln += len;
+
+			fprintf(stderr, "+%s = %s\n", start, new);
+			rewrite = endptr;
+			*end = c;
+			break;
+		}
+	} while (next);
+
+	free(temp);
+	fprintf(stderr, "rewritten: %s\n", new);
+	return new;
+}
+
 static bool
 route_match(struct gmnisrv_route *route, const char *path, char **revised)
 {
@@ -227,7 +347,8 @@ route_match(struct gmnisrv_route *route, const char *path, char **revised)
 			free(capture);
 			return false;
 		}
-		*revised = strdup(path);
+		*revised = process_rewrites(route, path, capture, ncapture);
+		free(capture);
 		return true;
 	}
 

@@ -213,6 +213,7 @@ conf_ini_handler(void *user, const char *section,
 		char *name;
 		char **value;
 	} route_strvars[] = {
+		{ "rewrite", &route->rewrite },
 		{ "root", &route->root },
 		{ "index", &route->index },
 	};
@@ -227,6 +228,11 @@ conf_ini_handler(void *user, const char *section,
 	for (size_t i = 0; i < sizeof(route_strvars) / sizeof(route_strvars[0]); ++i) {
 		if (strcmp(route_strvars[i].name, name) != 0) {
 			continue;
+		}
+		if (strcmp(route_strvars[i].name, "rewrite") == 0
+				&& routing != ROUTE_REGEX) {
+			fprintf(stderr, "rewrite directives are only valid for regex routes\n");
+			return 0;
 		}
 		*route_strvars[i].value = strdup(value);
 		return 1;
@@ -315,9 +321,10 @@ config_finish(struct gmnisrv_config *conf)
 			}
 
 			struct gmnisrv_route *rnext = route->next;
-			free(route->spec);
-			free(route->root);
 			free(route->index);
+			free(route->rewrite);
+			free(route->root);
+			free(route->spec);
 			free(route);
 			route = rnext;
 		}

@@ -91,6 +91,24 @@ Within each routing section, the following keys are used to configure how
 	*[example.org:/foo]* with the root set to /srv/gemini,
 	/srv/gemini/foo/bar.txt will be served.
 
+*rewrite*
+	If regular expression routing is used, the rewrite directive may be used
+	to rewrite the URL path component before proceeding. The URL will be set
+	to the value of the rewrite expression. If *\\N* appears in the rewrite
+	value, where *N* is a number, that capture group will be substituted for
+	*\\N*. If *\\{name}* appears, where *name* is a named capture group, it
+	will be substituted.
+
+	Example:
+
+	```
+	[localhost~^/([a-zA-Z]+)\.(?<extension>png|jpg)$]
+	root=./root
+	rewrite=/images/\1.\{extension}
+	```
+
+	This will rewrite a request for /example.png to /images/example.png.
+
 *index*
 	Configures the name of the index file which shall be served in the event
 	that a request for this host does not include the filename part.
