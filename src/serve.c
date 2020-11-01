@@ -217,8 +217,22 @@ route_match(struct gmnisrv_route *route, const char *path, const char **revised)
 			*revised = &path[l];
 		}
 		return true;
-	case ROUTE_REGEX:
-		assert(0); // TODO
+	case ROUTE_REGEX:;
+		int ncapture = lre_get_capture_count(route->regex);
+		uint8_t **capture = NULL;
+		if (ncapture > 0) {
+			capture = malloc(sizeof(capture[0]) * ncapture * 2);
+			assert(capture);
+		}
+		int r = lre_exec(capture, route->regex,
+			(const uint8_t *)path, 0, strlen(path), 0, NULL);
+		if (r != 1) {
+			free(capture);
+			return false;
+		}
+		// TODO: Process captures and rewrites
+		*revised = path;
+		return true;
 	}
 
 	assert(0); // Invariant
