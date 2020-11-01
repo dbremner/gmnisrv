@@ -198,8 +198,9 @@ serve_cgi(struct gmnisrv_client *client, const char *path,
 }
 
 static bool
-route_match(struct gmnisrv_route *route, const char *path, const char **revised)
+route_match(struct gmnisrv_route *route, const char *path, char **revised)
 {
+	free(*revised);
 	switch (route->routing) {
 	case ROUTE_PATH:;
 		size_t l = strlen(route->path);
@@ -211,11 +212,7 @@ route_match(struct gmnisrv_route *route, const char *path, const char **revised)
 			// route == "/foo":
 			return false;
 		}
-		if (route->path[l-1] == '/') {
-			*revised = &path[l-1];
-		} else {
-			*revised = &path[l];
-		}
+		*revised = strdup(path);
 		return true;
 	case ROUTE_REGEX:;
 		int ncapture = lre_get_capture_count(route->regex);
@@ -230,8 +227,7 @@ route_match(struct gmnisrv_route *route, const char *path, const char **revised)
 			free(capture);
 			return false;
 		}
-		// TODO: Process captures and rewrites
-		*revised = path;
+		*revised = strdup(path);
 		return true;
 	}
 
@@ -246,7 +242,7 @@ serve_request(struct gmnisrv_client *client)
 	struct gmnisrv_route *route = host->routes;
 	assert(route);
 
-	const char *url_path;
+	char *url_path = NULL;
 	while (route) {
 		if (route_match(route, client->path, &url_path)) {
 			break;
@@ -315,6 +311,7 @@ serve_request(struct gmnisrv_client *client)
 		if (S_ISDIR(st.st_mode)) {
 			if (route->autoindex) {
 				serve_autoindex(client, real_path);
+				free(url_path);
 				return;
 			} else {
 				strncat(real_path,
@@ -329,6 +326,7 @@ serve_request(struct gmnisrv_client *client)
 				client_submit_response(client,
 					GEMINI_STATUS_NOT_FOUND,
 					"Not found", NULL);
+				free(url_path);
 				return;
 			}
 			ssize_t s = readlink(real_path, temp_path, sizeof(temp_path));
@@ -340,9 +338,12 @@ serve_request(struct gmnisrv_client *client)
 			// Don't serve special files
 			client_submit_response(client,
 				GEMINI_STATUS_NOT_FOUND, "Not found", NULL);
+			free(url_path);
 			return;
 		}
 	}
+
+	free(url_path);
 
 	if (route->cgi) {
 		serve_cgi(client, real_path,

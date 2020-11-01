@@ -84,9 +84,12 @@ Within each routing section, the following keys are used to configure how
 
 *root*
 	Configures the path on disk from which files shall be served for this
-	host. If using path prefix matching, the prefix is trimmed, so if
-	example.org/foo/bar.txt is requested and matches *[example.org:/foo]*,
-	"bar.txt" will be appended to the root to form the file path.
+	host. The path component of the URL will be appended to this value to
+	form the path to files on disk to serve.
+
+	If example.org/foo/bar.txt is requested, and a route is configured for
+	*[example.org:/foo]* with the root set to /srv/gemini,
+	/srv/gemini/foo/bar.txt will be served.
 
 *index*
 	Configures the name of the index file which shall be served in the event
