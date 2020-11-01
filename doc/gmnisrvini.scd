@@ -49,16 +49,16 @@ name of the configuration section is used to determine what kinds of requests it
 configures.
 
 The format of the section name is the _hostname_ to be serviced, followed by a
-token which defines the routing strategy, and a string whose format is specific
-to each routing strategy. The token and match string may be omitted
+token which defines the routing strategy, and a _string_ whose format is
+specific to each routing strategy. The token and match string may be omitted
 (i.e. [_hostname_] alone), which implies path routing against "/".
 
 |] *:*
 :< Route by path prefix. The URL path is compared to "_string_/".
 |  *=*
-:  Exact match. The URL path must exactly match the string.
+:  Exact match. The URL path must exactly match the _string_.
 |  *~*
-:  Regular expression routing. The string is a JavaScript-compatible regular
+:  Regular expression routing. The _string_ is a JavaScript-compatible regular
    expression which is tested against the URL path.
 
 See ECMAScript 2018 (ECMA-282, 9th Edition), section 21.2 for a definition of
