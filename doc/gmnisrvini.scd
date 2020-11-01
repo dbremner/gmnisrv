@@ -61,8 +61,8 @@ to each routing strategy. The token and match string may be omitted
 :  Regular expression routing. The string is a JavaScript-compatible regular
    expression which is tested against the URL path.
 
-See ECMAScript 2016, section 21.2 for a definition of the regular expression
-syntax and features, or an informative reference on MDN:
+See ECMAScript 2018 (ECMA-282, 9th Edition), section 21.2 for a definition of
+the regular expression syntax and features, or an informative reference on MDN:
 
 https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_Expressions
 
