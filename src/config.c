@@ -166,6 +166,8 @@ conf_ini_handler(void *user, const char *section,
 		routing = ROUTE_REGEX;
 		spec = &section[hostln + 1];
 		break;
+	default:
+		assert(0);
 	}
 	assert(hostln < sizeof(hostname));
 	strncpy(hostname, section, hostln);
