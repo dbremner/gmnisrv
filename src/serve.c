@@ -457,6 +457,12 @@ serve_request(struct gmnisrv_client *client)
 			assert(s != -1);
 			strcpy(real_path, temp_path);
 		} else if (S_ISREG(st.st_mode)) {
+			if (route->cgi && access(real_path, X_OK)) {
+				client_submit_response(client,
+					GEMINI_STATUS_PERMANENT_FAILURE, "Internal Server Error", NULL);
+				return;
+			}
+
 			break;
 		} else {
 			// Don't serve special files
