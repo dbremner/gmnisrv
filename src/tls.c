@@ -58,7 +58,7 @@ tls_host_gencert(struct gmnisrv_tls *tlsconf, struct gmnisrv_host *host,
 	assert(r);
 
 	int pfd = open(keypath, O_CREAT | O_WRONLY, 0600);
-	if (!pfd) {
+	if (pfd < 0) {
 		server_error("opening private key for writing failed: %s",
 			strerror(errno));
 		return 1;
