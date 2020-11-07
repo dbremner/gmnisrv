@@ -200,7 +200,7 @@ disconnect_client(struct gmnisrv_server *server, struct gmnisrv_client *client)
 	memmove(client, &client[1], &server->clients[server->clientsz] - client);
 	memmove(&server->fds[server->nlisten + index],
 		&server->fds[server->nlisten + index + 1],
-		server->fdsz - (server->nlisten + index + 1) * sizeof(struct pollfd));
+		(server->fdsz - (server->nlisten + index + 1)) * sizeof(struct pollfd));
 	--server->nfds;
 	--server->nclients;
 }
