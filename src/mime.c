@@ -71,6 +71,8 @@ mime_init()
 
 		free(mime);
 	}
+	free(line);
+	fclose(f);
 
 	qsort(mimedb, mimedb_ln, sizeof(mimedb[0]), mimedb_compar);
 }

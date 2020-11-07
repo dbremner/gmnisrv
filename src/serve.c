@@ -375,6 +375,7 @@ serve_request(struct gmnisrv_client *client)
 	if (!route) {
 		client_submit_response(client,
 			GEMINI_STATUS_NOT_FOUND, "Not found", NULL);
+		free(url_path);
 		return;
 	}
 
@@ -390,6 +391,7 @@ serve_request(struct gmnisrv_client *client)
 	if ((size_t)n >= sizeof(real_path)) {
 		client_submit_response(client, GEMINI_STATUS_PERMANENT_FAILURE,
 			"Request path exceeds PATH_MAX", NULL);
+		free(url_path);
 		return;
 	}
 	strcpy(client_path, client->path);
@@ -426,6 +428,7 @@ serve_request(struct gmnisrv_client *client)
 
 			client_submit_response(client,
 				GEMINI_STATUS_NOT_FOUND, "Not found", NULL);
+			free(url_path);
 			return;
 		}
 
