@@ -167,7 +167,7 @@ serve_cgi(struct gmnisrv_client *client, const char *path,
 		assert(addrs);
 
 		// Compatible with Jetforce
-		setenv("GATEWAY_INTERFACE", "GCI/1.1", 1);
+		setenv("GATEWAY_INTERFACE", "CGI/1.1", 1);
 		setenv("SERVER_PROTOCOL", "GEMINI", 1);
 		setenv("SERVER_SOFTWARE", "gmnisrv/0.0.0", 1);
 		setenv("GEMINI_URL", client->buf, 1);
