@@ -197,7 +197,9 @@ disconnect_client(struct gmnisrv_server *server, struct gmnisrv_client *client)
 	free(client->path);
 
 	size_t index = (client - server->clients) / sizeof(struct gmnisrv_client);
-	memmove(client, &client[1], &server->clients[server->clientsz] - client);
+	memmove(&server->clients[index],
+		&server->clients[index + 1],
+		(server->clientsz - (index + 1)) * sizeof(struct gmnisrv_client));
 	memmove(&server->fds[server->nlisten + index],
 		&server->fds[server->nlisten + index + 1],
 		(server->fdsz - (server->nlisten + index + 1)) * sizeof(struct pollfd));
