@@ -321,6 +321,7 @@ static bool
 route_match(struct gmnisrv_route *route, const char *path, char **revised)
 {
 	free(*revised);
+	*revised = NULL;
 	switch (route->routing) {
 	case ROUTE_PATH:;
 		size_t l = strlen(route->path);
