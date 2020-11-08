@@ -373,9 +373,9 @@ queue_ssl_write:
 			return DISCONNECTED;
 		} else {
 			client->bufln += r;
+			client->pollfd->events = POLLOUT;
 		}
 	} while (r > 0);
-	client->pollfd->events = POLLOUT;
 	return CONNECTED;
 }
 
