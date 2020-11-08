@@ -209,6 +209,10 @@ disconnect_client(struct gmnisrv_server *server, struct gmnisrv_client *client)
 		(server->fdsz - (server->nlisten + index + 1)) * sizeof(struct pollfd));
 	--server->nfds;
 	--server->nclients;
+
+	for (size_t idx = index; idx < server->nclients; idx++) {
+	    server->clients[idx].pollfd = &server->fds[server->nlisten + index];
+	}
 }
 
 static int
