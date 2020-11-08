@@ -145,6 +145,10 @@ serve_cgi(struct gmnisrv_client *client, const char *path,
 		dup2(pfd[1], STDOUT_FILENO);
 		close(pfd[1]);
 
+		char cwd[PATH_MAX + 1];
+		strcpy(cwd, path);
+		chdir(dirname(cwd));
+
 		// I don't feel like freeing this stuff and this process is
 		// going to die soon anyway so let's just be hip and call it an
 		// arena allocator :^)
