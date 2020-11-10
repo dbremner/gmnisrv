@@ -211,7 +211,7 @@ disconnect_client(struct gmnisrv_server *server, struct gmnisrv_client *client)
 	--server->nclients;
 
 	for (size_t idx = index; idx < server->nclients; idx++) {
-	    server->clients[idx].pollfd = &server->fds[server->nlisten + index];
+	    server->clients[idx].pollfd = &server->fds[server->nlisten + idx];
 	}
 }
 
