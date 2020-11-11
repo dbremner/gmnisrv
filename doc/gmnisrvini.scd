@@ -140,7 +140,7 @@ The following environment variables will be set:
 :[ *Example*
 :< *Description*
 |  *GATEWAY_INTERFACE*
-:  GCI/1.1
+:  CGI/1.1
 :  CGI version
 |  *SERVER_PROTOCOL*
 :  GEMINI
