@@ -2,4 +2,5 @@
 build
 gmnisrv
 *.1
+*.5
 *.o
