@@ -459,6 +459,14 @@ serve_request(struct gmnisrv_client *client)
 				strncat(real_path,
 					route->index ? route->index : "index.gmi",
 					sizeof(real_path) - 1);
+				if (stat(real_path, &st) != 0) {
+					server_error("CGI path %s has no index",
+						client_path);
+					client_submit_response(client,
+						GEMINI_STATUS_NOT_FOUND,
+						"Not found", NULL);
+					return;
+				}
 			}
 		} else if (S_ISLNK(st.st_mode)) {
 			++nlinks;
