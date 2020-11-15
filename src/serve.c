@@ -407,21 +407,34 @@ serve_request(struct gmnisrv_client *client)
 		if ((n = stat(real_path, &st)) != 0) {
 			if (route->cgi) {
 				const char *new;
-				strcpy(temp_path, client_path);
-				new = basename((char *)temp_path);
+				size_t r = strlen(real_path);
+				if (real_path[r - 1] == '/') {
+					new = "";
+				} else {
+					strcpy(temp_path, client_path);
+					new = basename((char *)temp_path);
+				}
 
 				size_t l = strlen(new), q = strlen(pathinfo);
 				memmove(&pathinfo[l + 1], pathinfo, q);
 				pathinfo[0] = '/';
 				memcpy(&pathinfo[1], new, l);
 
-				strcpy(temp_path, client_path);
-				new = dirname((char *)temp_path);
-				strcpy(client_path, new);
+				if (real_path[r - 1] == '/') {
+					client_path[strlen(client_path) - 1] = '\0';
+				} else {
+					strcpy(temp_path, client_path);
+					new = dirname((char *)temp_path);
+					strcpy(client_path, new);
+				}
 
-				strcpy(temp_path, real_path);
-				new = dirname((char *)temp_path);
-				strcpy(real_path, new);
+				if (real_path[r - 1] == '/') {
+					real_path[r - 1] = '\0';
+				} else {
+					strcpy(temp_path, real_path);
+					new = dirname((char *)temp_path);
+					strcpy(real_path, new);
+				}
 
 				if (route_match(route, client_path, &url_path)) {
 					n = snprintf(real_path, sizeof(real_path),
