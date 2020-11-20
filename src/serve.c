@@ -147,7 +147,8 @@ serve_cgi(struct gmnisrv_client *client, const char *path,
 
 		char cwd[PATH_MAX + 1];
 		strcpy(cwd, path);
-		chdir(dirname(cwd));
+		int chdir_res = chdir(dirname(cwd));
+		assert(chdir_res != -1);
 
 		// I don't feel like freeing this stuff and this process is
 		// going to die soon anyway so let's just be hip and call it an
