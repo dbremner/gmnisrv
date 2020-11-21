@@ -23,17 +23,12 @@ tls_host_gencert(struct gmnisrv_tls *tlsconf, struct gmnisrv_host *host,
 	EVP_PKEY *pkey = EVP_PKEY_new();
 	assert(pkey);
 
-	BIGNUM *bn = BN_new();
-	assert(bn);
-	BN_set_word(bn, RSA_F4);
-
-	RSA* rsa = RSA_new();
-	assert(rsa);
-	int r = RSA_generate_key_ex(rsa, 4096, bn, NULL);
+	EC_KEY* ec_key = EC_KEY_new_by_curve_name(NID_secp384r1);
+	assert(ec_key);
+	int r = EC_KEY_generate_key(ec_key);
 	assert(r == 1);
-	BN_free(bn);
 
-	EVP_PKEY_assign_RSA(pkey, rsa);
+	EVP_PKEY_assign_EC_KEY(pkey, ec_key);
 
 	X509 * x509 = X509_new();
 	assert(x509);
