@@ -1,6 +1,7 @@
 #include <arpa/inet.h>
 #include <assert.h>
 #include <stdarg.h>
+#include <string.h>
 #include <stdio.h>
 #include <sys/socket.h>
 #include "log.h"
@@ -17,11 +18,26 @@ static void
 client_logf(FILE *f, struct sockaddr *addr, const char *fmt, va_list ap)
 {
 	char abuf[INET6_ADDRSTRLEN + 1];
-	const char *addrs = inet_ntop(addr->sa_family,
-		addr->sa_data, abuf, sizeof(abuf));
-	assert(addrs);
 
-	fprintf(f, "%s ", addrs);
+	switch(addr->sa_family) {
+	case AF_INET: {
+	  struct sockaddr_in *addr_in = (struct sockaddr_in *)addr;
+	  const char* result = inet_ntop(AF_INET, &(addr_in->sin_addr), abuf, INET_ADDRSTRLEN);
+	  assert(result);
+	  break;
+	}
+	case AF_INET6: {
+	  struct sockaddr_in6 *addr_in6 = (struct sockaddr_in6 *)addr;
+	  const char* result = inet_ntop(AF_INET6, &(addr_in6->sin6_addr), abuf, INET6_ADDRSTRLEN);
+	  assert(result);
+	  break;
+	}
+	default:
+	  strncpy(abuf, "Unknown AF", INET6_ADDRSTRLEN);
+	  break;
+	}
+
+	fprintf(f, "%s ", abuf);
 	vfprintf(f, fmt, ap);
 	fprintf(f, "\n");
 }
