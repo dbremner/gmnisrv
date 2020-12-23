@@ -77,8 +77,15 @@ serve_autoindex(struct gmnisrv_client *client, const char *path)
 				namesz *= 2;
 				names = new;
 			}
-			names[nameln++] = strdup(ent->d_name);
-			bufsz += snprintf(NULL, 0, "=> %s\n", ent->d_name);
+			if (S_ISDIR(st.st_mode)){
+				// +1 for trailing slash, +1 for \0
+				names[nameln] = malloc(strlen(ent->d_name)+1+1);
+				sprintf(names[nameln], "%s/", ent->d_name);
+			} else {
+				names[nameln] = strdup(ent->d_name);
+			}
+			bufsz += snprintf(NULL, 0, "=> %s\n", names[nameln]);
+			nameln++;
 		}
 
 		errno = 0;
