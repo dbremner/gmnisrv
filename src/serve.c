@@ -96,6 +96,7 @@ serve_autoindex(struct gmnisrv_client *client, const char *path)
 
 	qsort(names, nameln, sizeof(names[0]), namecmp);
 
+	bufsz++; // buffer needs to have room for the \0.
 	FILE *buf = fmemopen(NULL, bufsz, "w+");
 	if (!buf) {
 		goto internal_error;
