@@ -12,6 +12,7 @@ struct gmnisrv_tls {
 };
 
 enum gmnisrv_routing {
+	ROUTE_EXACT,
 	ROUTE_PATH,
 	ROUTE_REGEX,
 };

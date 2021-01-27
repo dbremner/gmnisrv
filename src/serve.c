@@ -337,6 +337,12 @@ route_match(struct gmnisrv_route *route, const char *path, char **revised)
 	free(*revised);
 	*revised = NULL;
 	switch (route->routing) {
+	case ROUTE_EXACT:;
+		if (strlen(route->path)==strlen(path) && strncmp(path, route->path, strlen(route->path)) == 0 ) {
+			*revised = strdup(path);
+			return true;
+		}
+		return false;
 	case ROUTE_PATH:;
 		size_t l = strlen(route->path);
 		if (strncmp(path, route->path, l) != 0) {

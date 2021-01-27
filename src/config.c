@@ -152,11 +152,15 @@ conf_ini_handler(void *user, const char *section,
 	const char *spec;
 	char hostname[1024 + 1];
 	enum gmnisrv_routing routing;
-	size_t hostln = strcspn(section, ":~");
+	size_t hostln = strcspn(section, "=:~");
 	switch (section[hostln]) {
 	case '\0':
 		routing = ROUTE_PATH;
 		spec = "/";
+		break;
+	case '=':
+		routing = ROUTE_EXACT;
+		spec = &section[hostln + 1];
 		break;
 	case ':':
 		routing = ROUTE_PATH;
@@ -196,6 +200,7 @@ conf_ini_handler(void *user, const char *section,
 
 		switch (route->routing) {
 		case ROUTE_PATH:
+		case ROUTE_EXACT:
 			route->path = strdup(spec);
 			break;
 		case ROUTE_REGEX:
@@ -315,6 +320,7 @@ config_finish(struct gmnisrv_config *conf)
 		while (route) {
 			switch (route->routing) {
 			case ROUTE_PATH:
+			case ROUTE_EXACT:
 				free(route->path);
 				break;
 			case ROUTE_REGEX:
