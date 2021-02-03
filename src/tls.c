@@ -5,7 +5,7 @@
 #include <openssl/err.h>
 #include <openssl/pem.h>
 #include <openssl/ssl.h>
-#include <openssl/x509.h>
+#include <openssl/x509v3.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -33,6 +33,7 @@ tls_host_gencert(struct gmnisrv_tls *tlsconf, struct gmnisrv_host *host,
 	X509 * x509 = X509_new();
 	assert(x509);
 
+	X509_set_version(x509, 2);
 	ASN1_INTEGER_set(X509_get_serialNumber(x509), 1);
 	X509_gmtime_adj(X509_get_notBefore(x509), 0);
 	X509_gmtime_adj(X509_get_notAfter(x509), 31536000L); // 1 year
@@ -48,6 +49,18 @@ tls_host_gencert(struct gmnisrv_tls *tlsconf, struct gmnisrv_host *host,
 	X509_NAME_add_entry_by_txt(name, "CN", MBSTRING_ASC,
 		(unsigned char *)host->hostname, -1, -1, 0);
 	X509_set_issuer_name(x509, name);
+
+	X509V3_CTX ctx;
+	X509V3_set_ctx_nodb(&ctx);
+	X509V3_set_ctx(&ctx, NULL, x509, NULL, NULL, 0);
+	char alt_name[512];
+	r = snprintf(alt_name, sizeof(alt_name), "DNS:%s", host->hostname);
+	assert(r >= 0 && (size_t)r < sizeof(alt_name));
+	X509_EXTENSION* ext = X509V3_EXT_conf_nid(NULL, &ctx,
+		NID_subject_alt_name, alt_name);
+	assert(ext);
+	X509_add_ext(x509, ext, -1);
+	X509_EXTENSION_free(ext);
 
 	r = X509_sign(x509, pkey, EVP_sha256());
 	assert(r);
