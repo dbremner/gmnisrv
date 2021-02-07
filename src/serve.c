@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <libgen.h>
 #include <limits.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -141,6 +142,7 @@ serve_cgi(struct gmnisrv_client *client, const char *path,
 		return;
 	}
 
+	signal(SIGCHLD, SIG_IGN);
 	pid_t pid = fork();
 	if (pid == -1) {
 		server_error("fork: %s", strerror(errno));
