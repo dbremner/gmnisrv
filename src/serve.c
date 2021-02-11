@@ -199,7 +199,36 @@ serve_cgi(struct gmnisrv_client *client, const char *path,
 		setenv("TLS_CIPHER", SSL_CIPHER_get_name(cipher), 1);
 		setenv("TLS_VERSION", SSL_CIPHER_get_version(cipher), 1);
 
-		// TODO: Client certificate details
+		// barebones client cert implementation
+		// adapted from openssl(1)'s implementation
+		// TODO: support REMOTE_USER, TLS_CLIENT_NOT_{BEFORE,AFTER},
+		//       TLS_CLIENT_SERIAL_NUMBER
+		X509 *client_cert = SSL_get_peer_certificate(client->ssl);
+		if (client_cert != NULL) {
+			// 32 bytes because we're always using SHA256, but
+			// possibly change to EVP_MAX_MD_SIZE to support all
+			// of openssl's hash funcs
+			unsigned char digest[32];
+
+			if (X509_digest(client_cert, EVP_sha256(), digest, NULL)) {
+				setenv("AUTH_TYPE", "CERTIFICATE", 1);
+				// 32*2 because converting to hex doubles length
+				// +7 for "SHA256:" prefix
+				// +1 for null char
+				char hex_digest[32*2 + 7 + 1];
+				strncat(hex_digest, "SHA256:", 8);
+
+				char *cur_pos = hex_digest + 7;
+				for (int i = 0; i < 32; ++i) {
+					cur_pos += sprintf(cur_pos, "%02X", digest[i]);
+				}
+				setenv("TLS_CLIENT_HASH", hex_digest, 1);
+			} else {
+				const char *error = "Out of memory";
+				client_submit_response(client,
+						GEMINI_STATUS_TEMPORARY_FAILURE, error, NULL);
+			}
+		}
 
 		execlp(path, path, NULL);
 		server_error("execlp: %s", strerror(errno));

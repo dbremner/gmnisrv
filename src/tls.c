@@ -15,6 +15,14 @@
 #include "util.h"
 
 static int
+always_true_callback(X509_STORE_CTX *ctx, void *arg)
+{
+	(void)(ctx);
+	(void)(arg);
+	return 1;
+}
+
+static int
 tls_host_gencert(struct gmnisrv_tls *tlsconf, struct gmnisrv_host *host,
 	const char *crtpath, const char *keypath)
 {
@@ -185,6 +193,9 @@ tls_init(struct gmnisrv_config *conf)
 	assert(r == 1);
 
 	SSL_CTX_set_tlsext_servername_callback(conf->tls.ssl_ctx, NULL);
+	SSL_CTX_set_verify(conf->tls.ssl_ctx, SSL_VERIFY_PEER, NULL);
+	// use always_true_callback to ignore errors such as self-signed error
+	SSL_CTX_set_cert_verify_callback(conf->tls.ssl_ctx, always_true_callback, NULL);
 
 	// TLS re-negotiation is a fucking STUPID idea
 	// I'm gating this behind an #ifdef based on an optimistic assumption

@@ -175,6 +175,12 @@ The following environment variables will be set:
 |  *TLS_VERSION*
 :  TLSv1.3
 :  The negotiated TLS version.
+|  *AUTH_TYPE*
+:  CERTIFICATE
+:  Compatibility with RFC 3785.
+|  *TLS_CLIENT_HASH*
+:  SHA256:BD3A388021A92017B781504A3D24F324BF9DE11CE72606AB445D98A8EB00C5A8
+:  Unique fingerprint of the client certificate.
 
 \[1]: gemini://example.org/cgi-bin/foo.sh/bar?hello=world
 
