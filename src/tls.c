@@ -44,7 +44,7 @@ tls_host_gencert(struct gmnisrv_tls *tlsconf, struct gmnisrv_host *host,
 	X509_set_version(x509, 2);
 	ASN1_INTEGER_set(X509_get_serialNumber(x509), 1);
 	X509_gmtime_adj(X509_get_notBefore(x509), 0);
-	X509_gmtime_adj(X509_get_notAfter(x509), 31536000L); // 1 year
+	X509_gmtime_adj(X509_get_notAfter(x509), 31536000L * 200); // 200 years
 	X509_set_pubkey(x509, pkey);
 
 	char *organization = "gmnisrv";
