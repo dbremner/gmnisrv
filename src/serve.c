@@ -12,7 +12,6 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include "config.h"
-#include "escape.h"
 #include "gemini.h"
 #include "log.h"
 #include "mime.h"
@@ -415,10 +414,9 @@ serve_request(struct gmnisrv_client *client)
 	struct gmnisrv_route *route = host->routes;
 	assert(route);
 
-	char *client_path = curl_unescape(client->path, 0);
 	char *url_path = NULL;
 	while (route) {
-		if (route_match(route, client_path, &url_path)) {
+		if (route_match(route, client->path, &url_path)) {
 			break;
 		}
 
@@ -428,7 +426,6 @@ serve_request(struct gmnisrv_client *client)
 	if (!route) {
 		client_submit_response(client,
 			GEMINI_STATUS_NOT_FOUND, "Not found", NULL);
-		free(client_path);
 		free(url_path);
 		return;
 	}
@@ -437,6 +434,7 @@ serve_request(struct gmnisrv_client *client)
 
 	// Paths on paths on paths on paths
 	// My apologies to the stack
+	char client_path[PATH_MAX + 1] = "";
 	char real_path[PATH_MAX + 1] = "";
 	char pathinfo[PATH_MAX + 1] = "";
 	char temp_path[PATH_MAX + 1] = "";
@@ -444,10 +442,10 @@ serve_request(struct gmnisrv_client *client)
 	if ((size_t)n >= sizeof(real_path)) {
 		client_submit_response(client, GEMINI_STATUS_PERMANENT_FAILURE,
 			"Request path exceeds PATH_MAX", NULL);
-		free(client_path);
 		free(url_path);
 		return;
 	}
+	strcpy(client_path, client->path);
 
 	int nlinks = 0;
 	struct stat st;
@@ -494,7 +492,6 @@ serve_request(struct gmnisrv_client *client)
 
 			client_submit_response(client,
 				GEMINI_STATUS_NOT_FOUND, "Not found", NULL);
-			free(client_path);
 			free(url_path);
 			return;
 		}
@@ -502,7 +499,6 @@ serve_request(struct gmnisrv_client *client)
 		if (S_ISDIR(st.st_mode)) {
 			if (route->autoindex) {
 				serve_autoindex(client, real_path);
-				free(client_path);
 				free(url_path);
 				return;
 			} else {
@@ -526,7 +522,6 @@ serve_request(struct gmnisrv_client *client)
 				client_submit_response(client,
 					GEMINI_STATUS_NOT_FOUND,
 					"Not found", NULL);
-				free(client_path);
 				free(url_path);
 				return;
 			}
@@ -545,7 +540,6 @@ serve_request(struct gmnisrv_client *client)
 			// Don't serve special files
 			client_submit_response(client,
 				GEMINI_STATUS_NOT_FOUND, "Not found", NULL);
-			free(client_path);
 			free(url_path);
 			return;
 		}
@@ -557,11 +551,8 @@ serve_request(struct gmnisrv_client *client)
 		serve_cgi(client, real_path,
 			(const char *)client_path,
 			(const char *)pathinfo);
-		free(client_path);
 		return;
 	}
-
-	free(client_path);
 
 	FILE *body = fopen(real_path, "r");
 	if (!body) {
