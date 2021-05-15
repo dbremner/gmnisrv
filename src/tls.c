@@ -6,6 +6,7 @@
 #include <openssl/pem.h>
 #include <openssl/ssl.h>
 #include <openssl/x509v3.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -44,7 +45,7 @@ tls_host_gencert(struct gmnisrv_tls *tlsconf, struct gmnisrv_host *host,
 	X509_set_version(x509, 2);
 	ASN1_INTEGER_set(X509_get_serialNumber(x509), 1);
 	X509_gmtime_adj(X509_get_notBefore(x509), 0);
-	X509_gmtime_adj(X509_get_notAfter(x509), LONG_MAX);
+	X509_gmtime_adj(X509_get_notAfter(x509), INT32_MAX); // 68 years
 	X509_set_pubkey(x509, pkey);
 
 	char *organization = "gmnisrv";
