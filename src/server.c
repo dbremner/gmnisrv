@@ -200,7 +200,7 @@ disconnect_client(struct gmnisrv_server *server, struct gmnisrv_client *client)
 	free(client->path);
 	client->path = NULL;
 
-	size_t index = (client - server->clients) / sizeof(struct gmnisrv_client);
+	size_t index = client - server->clients;
 	memmove(&server->clients[index],
 		&server->clients[index + 1],
 		(server->clientsz - (index + 1)) * sizeof(struct gmnisrv_client));
