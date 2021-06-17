@@ -200,8 +200,7 @@ serve_cgi(struct gmnisrv_client *client, const char *path,
 
 		// barebones client cert implementation
 		// adapted from openssl(1)'s implementation
-		// TODO: support REMOTE_USER, TLS_CLIENT_NOT_{BEFORE,AFTER},
-		//       TLS_CLIENT_SERIAL_NUMBER
+		// TODO: support REMOTE_USER, TLS_CLIENT_NOT_{BEFORE,AFTER}
 		X509 *client_cert = SSL_get_peer_certificate(client->ssl);
 		if (client_cert != NULL) {
 			// 32 bytes because we're always using SHA256, but
@@ -226,6 +225,20 @@ serve_cgi(struct gmnisrv_client *client, const char *path,
 				const char *error = "Out of memory";
 				client_submit_response(client,
 						GEMINI_STATUS_TEMPORARY_FAILURE, error, NULL);
+				goto post_client_cert_parsing;
+			}
+
+			const ASN1_INTEGER *sn_asn = X509_get0_serialNumber(client_cert);
+			BIGNUM *sn_bn = ASN1_INTEGER_to_BN(sn_asn, NULL);
+			char *sn_dec = BN_bn2dec(sn_bn);
+			BN_free(sn_bn);
+			if (sn_dec != NULL) {
+				setenv("TLS_CLIENT_SERIAL_NUMBER", sn_dec, 1);
+				OPENSSL_free(sn_dec);
+			} else {
+				const char *error = "Invalid certificate serial number";
+				client_submit_response(client,
+						GEMINI_STATUS_CERTIFICATE_NOT_VALID, error, NULL);
 			}
 		}
 

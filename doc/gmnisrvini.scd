@@ -181,6 +181,9 @@ The following environment variables will be set:
 |  *TLS_CLIENT_HASH*
 :  SHA256:BD3A388021A92017B781504A3D24F324BF9DE11CE72606AB445D98A8EB00C5A8
 :  Unique fingerprint of the client certificate.
+|  *TLS_CLIENT_SERIAL_NUMBER*
+:  717823108622037499122666796829184010024179612962
+:  Serial number (decimal) of the client certificate.
 
 \[1]: gemini://example.org/cgi-bin/foo.sh/bar?hello=world
 
