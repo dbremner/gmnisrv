@@ -200,7 +200,7 @@ serve_cgi(struct gmnisrv_client *client, const char *path,
 
 		// barebones client cert implementation
 		// adapted from openssl(1)'s implementation
-		// TODO: support REMOTE_USER, TLS_CLIENT_NOT_{BEFORE,AFTER}
+		// TODO: support TLS_CLIENT_NOT_{BEFORE,AFTER}
 		X509 *client_cert = SSL_get_peer_certificate(client->ssl);
 		if (client_cert != NULL) {
 			// 32 bytes because we're always using SHA256, but
@@ -239,8 +239,24 @@ serve_cgi(struct gmnisrv_client *client, const char *path,
 				const char *error = "Invalid certificate serial number";
 				client_submit_response(client,
 						GEMINI_STATUS_CERTIFICATE_NOT_VALID, error, NULL);
+				goto post_client_cert_parsing;
+			}
+
+			X509_NAME* subject_name = X509_get_subject_name(client_cert);
+			int cn_index = X509_NAME_get_index_by_NID(subject_name,
+					NID_commonName, -1);
+			if (cn_index != -1) {
+				ASN1_STRING *cn_asn = X509_NAME_ENTRY_get_data(
+						X509_NAME_get_entry(subject_name, cn_index));
+				unsigned char *cn = malloc(ASN1_STRING_length(cn_asn));
+				ASN1_STRING_to_UTF8(&cn, cn_asn);
+				setenv("REMOTE_USER", (char*) cn, 1);
+				OPENSSL_free(cn);
+			} else {
+				setenv("REMOTE_USER", "", 1);
 			}
 		}
+		post_client_cert_parsing:
 
 		execlp(path, path, NULL);
 		server_error("execlp: %s", strerror(errno));

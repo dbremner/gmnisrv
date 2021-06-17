@@ -184,6 +184,9 @@ The following environment variables will be set:
 |  *TLS_CLIENT_SERIAL_NUMBER*
 :  717823108622037499122666796829184010024179612962
 :  Serial number (decimal) of the client certificate.
+|  *REMOTE_USER*
+:  gemini user
+:  Subject common name of the client certificate.
 
 \[1]: gemini://example.org/cgi-bin/foo.sh/bar?hello=world
 
