@@ -215,7 +215,7 @@ serve_cgi(struct gmnisrv_client *client, const char *path,
 				// +7 for "SHA256:" prefix
 				// +1 for null char
 				char hex_digest[32*2 + 7 + 1];
-				strncat(hex_digest, "SHA256:", 8);
+				strncpy(hex_digest, "SHA256:", 8);
 
 				char *cur_pos = hex_digest + 7;
 				for (int i = 0; i < 32; ++i) {
