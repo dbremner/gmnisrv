@@ -526,15 +526,16 @@ serve_request(struct gmnisrv_client *client)
 		}
 
 		if (S_ISDIR(st.st_mode)) {
-			if (route->autoindex) {
-				serve_autoindex(client, real_path);
-				free(url_path);
-				return;
-			} else {
+				strcpy(temp_path, real_path);
 				strncat(real_path,
 					route->index ? route->index : "index.gmi",
 					sizeof(real_path) - 1);
 				if (stat(real_path, &st) != 0) {
+					if (route->autoindex) {
+						serve_autoindex(client, temp_path);
+						free(url_path);
+						return;
+					}
 					server_error("CGI path %s has no index",
 						client_path);
 					client_submit_response(client,
@@ -542,7 +543,6 @@ serve_request(struct gmnisrv_client *client)
 						"Not found", NULL);
 					return;
 				}
-			}
 		} else if (S_ISLNK(st.st_mode)) {
 			++nlinks;
 			if (nlinks > 3) {
