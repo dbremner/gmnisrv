@@ -194,6 +194,7 @@ tls_init(struct gmnisrv_config *conf)
 	assert(r == 1);
 
 	SSL_CTX_set_tlsext_servername_callback(conf->tls.ssl_ctx, NULL);
+	SSL_CTX_set_session_id_context(conf->tls.ssl_ctx, (const unsigned char*)"gmnisrv", 7);
 	SSL_CTX_set_verify(conf->tls.ssl_ctx, SSL_VERIFY_PEER, NULL);
 	// use always_true_callback to ignore errors such as self-signed error
 	SSL_CTX_set_cert_verify_callback(conf->tls.ssl_ctx, always_true_callback, NULL);
