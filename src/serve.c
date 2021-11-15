@@ -8,6 +8,7 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -637,7 +638,7 @@ request_validate(struct gmnisrv_client *client, char **path)
 		client_submit_response(client,
 			GEMINI_STATUS_BAD_REQUEST, error, NULL);
 		goto exit;
-	} else if (strcmp(part, client->host->hostname) != 0) {
+	} else if (strcasecmp(part, client->host->hostname) != 0) {
 		free(part);
 		const char *error = "Protocol error: hostname does not match SNI";
 		client_submit_response(client,
