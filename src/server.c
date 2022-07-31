@@ -345,7 +345,10 @@ client_readable(struct gmnisrv_server *server, struct gmnisrv_client *client)
 		switch (e) {
 		case SSL_ERROR_WANT_READ:
 		case SSL_ERROR_WANT_WRITE:
-			goto queue_ssl_write;
+                        if (client->bufln == 0) {
+                                goto queue_ssl_write;
+                        }
+                        // intentional fallthrough
 		default:
 			client_submit_response(client,
 				GEMINI_STATUS_BAD_REQUEST, error, NULL);
