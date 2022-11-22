@@ -115,8 +115,19 @@ accept_client(struct gmnisrv_server *server, int fd)
 	int sockfd = accept(fd, &addr, &addrlen);
 	if (sockfd == -1) {
 		server_error("accept error: %s", strerror(errno));
+		if (errno == EMFILE) {
+			for (int i = 1; i < 4; i++) {
+				struct gmnisrv_client *client = &server->clients[server->nclients-i];
+				disconnect_client(server, client);
+			}
+			sockfd = accept(fd, &addr, &addrlen);
+			if (sockfd != -1) {
+				goto accepted;
+			}
+		}
 		return;
 	}
+accepted:;
 
 	int flags = fcntl(fd, F_GETFL);
 	int r = fcntl(fd, F_SETFL, flags | O_NONBLOCK);
