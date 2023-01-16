@@ -1,5 +1,7 @@
 # gmnisrv
 
+**Notice**: this project is no longer maintained.
+
 gmnisrv is a simple [Gemini](https://gemini.circumlunar.space) protocol server.
 
 ## Installation
